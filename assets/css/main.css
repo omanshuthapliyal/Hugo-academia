@@ -378,20 +378,64 @@ code {
     color: var(--color-text);
 }
 
+.highlight {
+    max-width: 100%;
+    min-width: 0;
+    margin: var(--sp-6) 0;
+}
+
+.highlight pre,
 pre {
     margin: var(--sp-6) 0;
     padding: var(--sp-5);
     background: var(--color-bg-code);
     border-radius: var(--radius-md);
     overflow-x: auto;
+    max-width: 100%;
+    min-width: 0;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    word-break: normal;
+    word-wrap: normal;
+    white-space: pre;
     font-size: var(--fs-sm);
     line-height: var(--lh-relaxed);
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
 }
 
+.highlight pre {
+    margin: 0;
+}
+
+.highlight pre code,
 pre code {
+    display: block;
+    width: max-content;
+    min-width: 100%;
     padding: 0;
     background: none;
     font-size: inherit;
+    white-space: pre;
+    overflow-wrap: normal;
+}
+
+pre::-webkit-scrollbar {
+    height: 6px;
+}
+
+pre::-webkit-scrollbar-track {
+    background: var(--color-bg-alt);
+    border-radius: var(--radius-sm);
+}
+
+pre::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: var(--radius-sm);
+}
+
+pre::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-muted);
 }
 
 /* Tables */
@@ -473,16 +517,21 @@ main {
 /* With TOC layout */
 .layout-with-toc {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--sp-10);
     max-width: var(--max-width-wide);
     margin: 0 auto;
     padding: 0 var(--sp-6);
 }
 
+.layout-with-toc > * {
+    min-width: 0;
+    max-width: 100%;
+}
+
 @media (min-width: 1100px) {
     .layout-with-toc {
-        grid-template-columns: 1fr var(--toc-width);
+        grid-template-columns: minmax(0, 1fr) var(--toc-width);
     }
 }
 
@@ -1207,6 +1256,8 @@ main {
    ----------------------------------------------------------------------------- */
 .article {
     max-width: var(--max-width-content);
+    min-width: 0;
+    width: 100%;
 }
 
 .article__header {
@@ -1240,6 +1291,10 @@ main {
 
 .article__content {
     /* Vertical rhythm for article content */
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 .article__content > * + * {
