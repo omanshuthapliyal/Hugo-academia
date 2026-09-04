@@ -378,10 +378,57 @@ code {
     color: var(--color-text);
 }
 
-.highlight {
+.highlight,
+.code-block-wrapper {
+    position: relative;
     max-width: 100%;
     min-width: 0;
     margin: var(--sp-6) 0;
+}
+
+.code-copy-btn {
+    position: absolute;
+    top: var(--sp-2);
+    right: var(--sp-2);
+    padding: var(--sp-1) var(--sp-3);
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    font-weight: 500;
+    color: var(--color-text-muted);
+    background: var(--color-bg-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity var(--duration-fast) var(--ease-out),
+        background var(--duration-fast) var(--ease-out),
+        color var(--duration-fast) var(--ease-out);
+}
+
+@media (hover: none), (max-width: 768px) {
+    .code-copy-btn {
+        opacity: 0.85;
+    }
+}
+
+@media (hover: hover) and (min-width: 769px) {
+    .highlight:hover .code-copy-btn,
+    .code-block-wrapper:hover .code-copy-btn,
+    pre:hover .code-copy-btn {
+        opacity: 1;
+    }
+}
+
+.code-copy-btn:hover {
+    opacity: 1;
+    background: var(--color-bg-elevated);
+    color: var(--color-text);
+}
+
+.code-copy-btn.copied {
+    color: var(--color-success);
+    border-color: var(--color-success);
 }
 
 .highlight pre,

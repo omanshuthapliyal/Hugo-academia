@@ -269,7 +269,17 @@
   
   codeBlocks.forEach(codeBlock => {
     const pre = codeBlock.parentElement;
-    pre.style.position = 'relative';
+    
+    // Anchor copy button to the non-scrolling wrapper (.highlight or .code-block-wrapper)
+    // so it stays pinned to the top-right when the user scrolls code horizontally
+    let wrapper = pre.parentElement;
+    if (!wrapper || (!wrapper.classList.contains('highlight') && !wrapper.classList.contains('code-block-wrapper'))) {
+      wrapper = document.createElement('div');
+      wrapper.className = 'code-block-wrapper';
+      pre.parentNode.insertBefore(wrapper, pre);
+      wrapper.appendChild(pre);
+    }
+    wrapper.style.position = 'relative';
     
     const copyButton = document.createElement('button');
     copyButton.className = 'code-copy-btn';
@@ -296,7 +306,7 @@
       }
     });
     
-    pre.appendChild(copyButton);
+    wrapper.appendChild(copyButton);
   });
 
   // ==========================================================================
@@ -365,6 +375,11 @@
 
 const copyButtonStyles = document.createElement('style');
 copyButtonStyles.textContent = `
+  .highlight,
+  .code-block-wrapper {
+    position: relative;
+  }
+  
   .code-copy-btn {
     position: absolute;
     top: var(--sp-2, 0.5rem);
@@ -378,16 +393,29 @@ copyButtonStyles.textContent = `
     border: 1px solid var(--color-border, #e0e0e0);
     border-radius: var(--radius-sm, 3px);
     cursor: pointer;
+    z-index: 10;
     opacity: 0;
-    transition: opacity 0.2s ease, background 0.2s ease;
+    transition: opacity 0.2s ease, background 0.2s ease, color 0.2s ease;
   }
   
-  pre:hover .code-copy-btn {
-    opacity: 1;
+  @media (hover: none), (max-width: 768px) {
+    .code-copy-btn {
+      opacity: 0.85;
+    }
+  }
+
+  @media (hover: hover) and (min-width: 769px) {
+    .highlight:hover .code-copy-btn,
+    .code-block-wrapper:hover .code-copy-btn,
+    pre:hover .code-copy-btn {
+      opacity: 1;
+    }
   }
   
   .code-copy-btn:hover {
+    opacity: 1;
     background: var(--color-bg-elevated, #fff);
+    color: var(--color-text);
   }
   
   .code-copy-btn.copied {
