@@ -39,7 +39,7 @@ $profileDept := $langProfile.department | default $globalProfile.department }}
     </p>
     {{ end }} {{/* Bio */}} {{ with $profileBio }}
     <div class="profile__bio">{{ . | markdownify }}</div>
-    {{ end }} {{/* Research summary */}} {{ if .Site.Params.research }}
+    {{ end }} {{/* Research summary (optional, default false to avoid redundancy) */}} {{ if and .Site.Params.research (default false .Site.Params.profile.showResearchSummary) }}
     <p class="profile__research">
         {{ i18n "my_research_includes" }} {{ $research := .Site.Params.research
         }} {{ range $i, $r := $research }} {{- if eq $i (sub (len $research) 1)
