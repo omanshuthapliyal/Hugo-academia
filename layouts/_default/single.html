@@ -88,7 +88,9 @@
            Everything else using this same template - blog posts, and
            individual paper/patent/project pages - keeps the plain title
            color; only About needs the modifier. */}}
-      <h1 class="article__title{{ if $isAbout }} article__title--page{{ end }}">{{ .Title }}</h1>
+      {{/* hide_title: true keeps the <h1> for screen readers and search
+           engines but hides it visually (used on About). */}}
+      <h1 class="article__title{{ if $isAbout }} article__title--page{{ end }}{{ if .Params.hide_title }} visually-hidden{{ end }}">{{ .Title }}</h1>
       
       {{/* Description */}}
       {{ with .Description }}

@@ -57,6 +57,13 @@
   <div class="list-content">
   <header class="section-header">
     <h1 class="section-header__title">{{ .Title }}</h1>
+    {{ if $isBlog }}
+    {{/* List | Table switch, right under the Blog title */}}
+    <div class="blog-browse__view-toggle blog-view-toggle--header" role="group" aria-label="View">
+      <button type="button" class="blog-browse__view-btn is-active" data-view="cards">List</button>
+      <button type="button" class="blog-browse__view-btn" data-view="table">Table</button>
+    </div>
+    {{ end }}
     {{ with .Description }}
       <p class="section-header__description">{{ . }}</p>
     {{ end }}
@@ -129,10 +136,6 @@
         <div class="blog-browse__search">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
           <input type="search" id="blog-search-input" placeholder="Search posts by title, tag, or excerpt&hellip;" aria-label="Search posts">
-        </div>
-        <div class="blog-browse__view-toggle" role="group" aria-label="View">
-          <button type="button" class="blog-browse__view-btn is-active" data-view="cards">Cards</button>
-          <button type="button" class="blog-browse__view-btn" data-view="table">Table</button>
         </div>
       </div>
       {{ if $allTags }}
@@ -225,6 +228,37 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--sp-2);
+  }
+
+  /* Tags under each post (list and table views): same pill shape as the
+     keyword chips on Publications. */
+  .list__tags .tag,
+  .blog-table__tags .tag {
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: normal;
+    padding: var(--sp-1) var(--sp-3);
+    color: var(--color-text-secondary);
+    background: var(--color-bg-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-full, 999px);
+    text-decoration: none;
+  }
+
+  .list__tags .tag:hover,
+  .blog-table__tags .tag:hover {
+    background: var(--color-bg-alt);
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+  }
+
+  .list__tags .tag.is-active,
+  .blog-table__tags .tag.is-active {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: white;
   }
 
   .list__empty {
@@ -399,6 +433,18 @@
     border: none;
     cursor: pointer;
     transition: all var(--duration-fast) var(--ease-out);
+  }
+
+  .blog-view-toggle--header {
+    display: inline-flex;
+    margin-top: var(--sp-4);
+  }
+
+  /* List and Table buttons share one width */
+  .blog-view-toggle--header .blog-browse__view-btn {
+    flex: 1 1 0;
+    min-width: 5.5rem;
+    text-align: center;
   }
 
   .blog-browse__view-btn + .blog-browse__view-btn {
