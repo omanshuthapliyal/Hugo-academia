@@ -18,7 +18,31 @@ unique years */}} {{ $years := slice }} {{ range $papers }} {{ $year :=
 .Date.Format "2006" }} {{ if not (in $years $year) }} {{ $years = $years |
 append $year }} {{ end }} {{ end }}
 
-<div class="{{ if $years }}layout-with-toc{{ else }}container{{ end }}">
+{{/* Collect every keyword across all papers, for an optional keyword-filter
+     row in the sidebar - same dormant-until-populated pattern as Projects'
+     tag filter (projects/list.html): stays hidden entirely while every
+     paper's keywords list is empty (as it is today), and appears
+     automatically once real keywords are added, with no template change
+     needed. Keywords are a separate taxonomy from tags - see hugo.yaml. */}}
+{{ $allKeywords := slice }}
+{{ range $papers }}
+  {{ range .Params.keywords }}
+    {{ if not (in $allKeywords .) }}
+      {{ $allKeywords = $allKeywords | append . }}
+    {{ end }}
+  {{ end }}
+{{ end }}
+{{ $allKeywords = sort $allKeywords }}
+
+{{/* layout-with-toc gives this page a right-hand "Year" jump-nav sidebar
+     (only shown ≥1100px - see .toc's mobile breakpoint in main.css), same
+     grid single.html uses for a real article TOC. Unlike single.html
+     articles, .publications-content has no independent max-width of its
+     own, so it's capped below to var(--max-width-content) - the same
+     720px every other section page's text column uses - rather than
+     stretching to fill the wider grid column. The sidebar is what gets
+     the extra width, not the reading column. */}}
+<div class="layout-with-toc">
     <div class="publications-content">
         <header class="section-header">
             <h1 class="section-header__title">{{ .Title }}</h1>
@@ -79,9 +103,13 @@ append $year }} {{ end }} {{ end }}
         {{ end }}
     </div>
 
-    {{/* Side TOC */}} {{ if or $spotlightPapers $years }}
-    <aside class="toc" aria-label="{{ i18n "table_of_contents" }}">
-        <p class="toc__title">{{ i18n "table_of_contents" }}</p>
+    {{/* Side jump-list - this is a Year index, not a real page TOC (Papers
+         is a list page with no .TableOfContents), so it's labeled "Year"
+         directly rather than reusing the generic table_of_contents i18n
+         string that About/other single pages' real TOCs use. */}}
+    {{ if or $spotlightPapers $years }}
+    <aside class="toc" aria-label="Year">
+        <p class="toc__title">Year</p>
         <nav class="toc__nav" id="publications-toc-nav">
             <ul class="toc__list">
                 {{ if $spotlightPapers }}
@@ -95,11 +123,36 @@ append $year }} {{ end }} {{ end }}
                 {{ end }}
             </ul>
         </nav>
+
+        {{/* Keyword filter - same chip + "Clear filters" idiom as Blog's
+             "Filter by tag" (see _default/list.html), rather than
+             Projects' All/status pills, since a keyword filter here is a
+             single-select toggle over one axis, not a second dimension
+             alongside Year. */}}
+        {{ if $allKeywords }}
+        <div class="publications-keyword-filter" id="publications-keyword-filter">
+            <p class="publications-keyword-filter__label">Filter by keyword</p>
+            <div class="publications-keyword-filter__chips" role="group" aria-label="Keywords">
+                {{ range $allKeywords }}
+                <button type="button" class="publications-keyword-filter__chip" data-keyword-filter="{{ . }}">{{ . }}</button>
+                {{ end }}
+                <button type="button" class="publications-keyword-filter__chip publications-keyword-filter__chip--clear" id="publications-keyword-clear" hidden>Clear filters</button>
+            </div>
+        </div>
+        {{ end }}
     </aside>
     {{ end }}
 </div>
 
 <style>
+    /* Keep the reading column the same width as every other section page
+       (About/Projects/Patents/Blog all use plain .container at
+       var(--max-width-content)) even though this page's grid column is
+       wider to make room for the Year sidebar. */
+    .publications-content {
+        max-width: var(--max-width-content);
+    }
+
     /* Spotlight Section */
     .publications-spotlight {
         margin-bottom: var(--sp-10);
@@ -210,7 +263,6 @@ append $year }} {{ end }} {{ end }}
         font-family: var(--font-serif);
         font-size: var(--fs-2xl);
         font-weight: 600;
-        color: var(--color-accent);
         border-bottom: 0;
         margin: 0;
         padding: 0;
@@ -342,6 +394,102 @@ append $year }} {{ end }} {{ end }}
         width: 16px;
         height: 16px;
     }
+
+    /* Same recurring bug this project has hit for .pagination, .publication
+       (this element itself, via the keyword filter below), and
+       .palette-switcher__row: an author rule and the browser's UA
+       `[hidden] { display: none }` rule tie in specificity, and the author
+       rule always wins regardless of source order - .publication sets its
+       own `display: grid` above, so hiding a filtered-out publication via
+       its `hidden` attribute would silently do nothing without this
+       explicit override. */
+    .publication[hidden] {
+        display: none;
+    }
+
+    /* Keyword filter - mirrors Blog's "Filter by tag" sidebar block
+       (blog-browse__tags*) one-for-one. Given its own divider line (rather
+       than just spacing) since it sits directly under the Year nav in the
+       same sidebar and the two are otherwise easy to read as one
+       continuous list. */
+    .publications-keyword-filter {
+        margin-top: var(--sp-6);
+        padding-top: var(--sp-6);
+        border-top: 1px solid var(--color-border-subtle);
+    }
+
+    .publications-keyword-filter__label {
+        font-size: var(--fs-xs);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--color-text-muted);
+        margin-bottom: var(--sp-3);
+    }
+
+    .publications-keyword-filter__chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--sp-2);
+    }
+
+    .publications-keyword-filter__chip {
+        font-family: var(--font-sans);
+        font-size: var(--fs-xs);
+        padding: var(--sp-1) var(--sp-3);
+        color: var(--color-text-secondary);
+        background: var(--color-bg-alt);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-full, 999px);
+        cursor: pointer;
+        transition: all var(--duration-fast) var(--ease-out);
+    }
+
+    .publications-keyword-filter__chip:hover {
+        border-color: var(--color-accent);
+        color: var(--color-accent);
+    }
+
+    .publications-keyword-filter__chip.is-active {
+        background: var(--color-accent);
+        color: white;
+        border-color: var(--color-accent);
+    }
+
+    /* Keyword chips inside each publication: same pill look as the
+       "Filter by keyword" chips in the sidebar (Round 23), and clicking
+       one applies that filter. Type labels (Conference / Journal) keep
+       their own style. */
+    .publication__tags .tag--keyword {
+        font-family: var(--font-sans);
+        font-size: var(--fs-xs);
+        font-weight: 400;
+        text-transform: none;
+        letter-spacing: normal;
+        padding: var(--sp-1) var(--sp-3);
+        color: var(--color-text-secondary);
+        background: var(--color-bg-alt);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-full, 999px);
+        text-decoration: none;
+    }
+
+    .publication__tags .tag--keyword:hover {
+        background: var(--color-bg-alt);
+        border-color: var(--color-accent);
+        color: var(--color-accent);
+    }
+
+    .publication__tags .tag--keyword.is-active {
+        background: var(--color-accent);
+        border-color: var(--color-accent);
+        color: white;
+    }
+
+    .publications-keyword-filter__chip--clear {
+        color: var(--color-text-muted);
+        border-style: dashed;
+    }
 </style>
 
 <script>
@@ -366,12 +514,19 @@ append $year }} {{ end }} {{ end }}
             })
 
             links.forEach((link) => {
-                link.classList.remove("toc-active")
+                // main.css styles the active Year link as .toc__link--active
+                // (it's what .toc__link/.toc__item/.toc__list already use
+                // site-wide) - this was previously toggling "toc-active"
+                // instead, a different convention that belongs to the
+                // separate toc.html partial (real page TOCs) and isn't
+                // loaded on this page at all, so the class was being set
+                // correctly on scroll but had no styling to show for it.
+                link.classList.remove("toc__link--active")
                 if (
                     currentSection &&
                     link.getAttribute("href") === "#" + currentSection.id
                 ) {
-                    link.classList.add("toc-active")
+                    link.classList.add("toc__link--active")
                 }
             })
         }
@@ -380,5 +535,111 @@ append $year }} {{ end }} {{ end }}
         updateActiveLink()
     })()
 </script>
+
+{{ if $allKeywords }}
+<script>
+    // Keyword filter - single-select toggle + "Clear filters", same
+    // interaction as Blog's "Filter by tag" (_default/list.html). Hides
+    // non-matching .publication items, then hides any Spotlight/Year/
+    // Category section left with none of its own items visible - same
+    // "hide the whole section if it's empty" idea as Projects' status/tag
+    // filter (projects/list.html).
+    ;(function () {
+        var filterBar = document.getElementById("publications-keyword-filter")
+        if (!filterBar) return
+
+        var chips = Array.prototype.slice.call(
+            filterBar.querySelectorAll("[data-keyword-filter]"),
+        )
+        var clearBtn = document.getElementById("publications-keyword-clear")
+        var items = Array.prototype.slice.call(
+            document.querySelectorAll(".publication"),
+        )
+        var categories = Array.prototype.slice.call(
+            document.querySelectorAll(".publications-category"),
+        )
+        var years = Array.prototype.slice.call(
+            document.querySelectorAll(".publications-year"),
+        )
+        var spotlight = document.querySelector(".publications-spotlight")
+
+        var activeKeyword = null
+
+        function anyVisible(container) {
+            return Array.prototype.some.call(
+                container.querySelectorAll(".publication"),
+                function (p) {
+                    return !p.hidden
+                },
+            )
+        }
+
+        function render() {
+            items.forEach(function (item) {
+                var keywords = (item.getAttribute("data-keywords") || "")
+                    .split(",")
+                    .filter(Boolean)
+                var visible = !activeKeyword || keywords.indexOf(activeKeyword) !== -1
+                item.hidden = !visible
+            })
+
+            categories.forEach(function (cat) {
+                cat.hidden = !anyVisible(cat)
+            })
+            years.forEach(function (year) {
+                year.hidden = !anyVisible(year)
+            })
+            if (spotlight) {
+                spotlight.hidden = !anyVisible(spotlight)
+            }
+
+            if (clearBtn) clearBtn.hidden = !activeKeyword
+            itemChips.forEach(function (c) {
+                c.classList.toggle("is-active", c.getAttribute("data-keyword") === activeKeyword)
+            })
+        }
+
+        // Keyword chips inside each publication act like the sidebar chips.
+        var itemChips = Array.prototype.slice.call(
+            document.querySelectorAll(".publication__tags .tag--keyword"),
+        )
+        itemChips.forEach(function (c) {
+            c.addEventListener("click", function (e) {
+                var kw = c.getAttribute("data-keyword")
+                var side = chips.filter(function (x) {
+                    return x.getAttribute("data-keyword-filter") === kw
+                })[0]
+                if (!side) return
+                e.preventDefault()
+                side.click()
+            })
+        })
+
+        chips.forEach(function (chip) {
+            chip.addEventListener("click", function () {
+                var keyword = chip.getAttribute("data-keyword-filter")
+                activeKeyword = activeKeyword === keyword ? null : keyword
+                chips.forEach(function (c) {
+                    c.classList.toggle(
+                        "is-active",
+                        c.getAttribute("data-keyword-filter") === activeKeyword,
+                    )
+                })
+                render()
+            })
+        })
+
+        if (clearBtn) {
+            clearBtn.addEventListener("click", function () {
+                activeKeyword = null
+                chips.forEach(function (c) {
+                    c.classList.remove("is-active")
+                })
+                render()
+            })
+        }
+    })()
+</script>
+{{ end }}
 
 {{ end }}

@@ -1,0 +1,18 @@
+{{/* Returns the broad-topic slugs for one project page (the context),
+     using site data/topics.yaml. A tag that no topic lists is returned as
+     itself, so un-mapped tags still work as their own filter. De-duplicated,
+     in topics.yaml order, then un-mapped tags. */}}
+{{ $topics := site.Data.topics | default slice }}
+{{ $out := slice }}
+{{ $mapped := slice }}
+{{ range $topics }}
+  {{ $t := . }}
+  {{ range $.Params.tags }}
+    {{ if and (in $t.tags .) (not (in $out $t.slug)) }}{{ $out = $out | append $t.slug }}{{ end }}
+    {{ if in $t.tags . }}{{ $mapped = $mapped | append . }}{{ end }}
+  {{ end }}
+{{ end }}
+{{ range .Params.tags }}
+  {{ if and (not (in $mapped .)) (not (in $out .)) }}{{ $out = $out | append . }}{{ end }}
+{{ end }}
+{{ return $out }}

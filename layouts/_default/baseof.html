@@ -35,15 +35,23 @@
   <link rel="alternate" hreflang="x-default" href="{{ .Site.Home.Permalink }}">
   {{ end }}
   
-  {{/* Fonts - Cormorant Garamond for headings, Montserrat for body */}}
+  {{/* Fonts - Lora for headings, IBM Plex Sans for body */}}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   
   {{/* Main stylesheet */}}
   {{ $css := resources.Get "css/main.css" | minify | fingerprint }}
   <link rel="stylesheet" href="{{ $css.RelPermalink }}" integrity="{{ $css.Data.Integrity }}">
-  
+
+  {{/* Syntax highlighting - separate light/dark Chroma stylesheets, scoped by
+       [data-theme]. Fixes code blocks reading as invisible in dark mode: the
+       theme's highlight.noClasses config previously baked one light-only
+       palette directly into each <pre>/<span> as inline styles, which can't
+       respond to a theme toggle at all. */}}
+  {{ $chroma := resources.Get "css/chroma.css" | minify | fingerprint }}
+  <link rel="stylesheet" href="{{ $chroma.RelPermalink }}" integrity="{{ $chroma.Data.Integrity }}">
+
   {{/* Custom CSS if exists */}}
   {{ if resources.Get "css/custom.css" }}
     {{ $customCSS := resources.Get "css/custom.css" | minify | fingerprint }}
@@ -187,6 +195,32 @@
       }
     })();
   </script>
+
+  {{/* KaTeX — renders $$...$$ math in post/page content. Content uses
+       $$...$$ for both inline and display expressions, and previously this
+       rendered $$ as display math, which forces its own block/line even
+       mid-sentence. Content authors use $$ inline throughout, so $$ is now
+       rendered inline (display:false) to match that intent. */}}
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css"
+        crossorigin="anonymous">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"
+          crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+          crossorigin="anonymous"></script>
+  <script defer>
+    document.addEventListener("DOMContentLoaded", function () {
+      if (typeof renderMathInElement === "function") {
+        renderMathInElement(document.body, {
+          delimiters: [
+            {left: "$$", right: "$$", display: false},
+            {left: "\\[", right: "\\]", display: true},
+            {left: "\\(", right: "\\)", display: false}
+          ],
+          throwOnError: false
+        });
+      }
+    });
+  </script>
 </head>
 <body>
   {{/* Skip link for accessibility */}}
@@ -209,7 +243,15 @@
   {{/* Main JavaScript */}}
   {{ $js := resources.Get "js/main.js" | minify | fingerprint }}
   <script src="{{ $js.RelPermalink }}" integrity="{{ $js.Data.Integrity }}" defer></script>
-  
+
+  {{/* Custom JS if exists - mirrors the custom.css hook above, so
+       preview-only additions (like the palette switcher) stay isolated
+       from the theme's own main.js and are trivial to remove later. */}}
+  {{ if resources.Get "js/custom.js" }}
+    {{ $customJS := resources.Get "js/custom.js" | minify | fingerprint }}
+    <script src="{{ $customJS.RelPermalink }}" integrity="{{ $customJS.Data.Integrity }}" defer></script>
+  {{ end }}
+
   {{/* Analytics */}}
   {{ if .Site.Params.analytics.google }}
     {{ template "_internal/google_analytics.html" . }}

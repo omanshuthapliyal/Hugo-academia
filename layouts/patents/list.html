@@ -1,0 +1,216 @@
+{{ define "main" }} {{/* Patents list template - flat list in a fixed curated
+order (page weight), mirroring the Publications page's visual language.
+Unlike Publications, most patent filings here have no public grant/filing
+date to group by, so this intentionally skips year-grouping. */}}
+
+{{ $patents := .Pages.ByWeight }}
+
+{{/* Distinct status labels present across all patents, using the same
+     derivation as patent-item.html's data-status attribute (real status
+     text when set, else "Filed" when a real patent/application number is
+     on file). Backs the sidebar's status filter chips - only labels that
+     actually occur get a chip, so this adapts automatically if a new
+     status value (e.g. "Granted") shows up later. */}}
+{{ $statusLabels := slice }}
+{{ range $patents }}
+  {{ $label := "" }}
+  {{ $label = "Pending" }}
+  {{ with .Params.patent_number }}{{ if hasPrefix (upper .) "US" }}{{ $label = "Granted" }}{{ else }}{{ $label = "Filed" }}{{ end }}{{ end }}
+  {{ with .Params.status }}{{ $label = . | title }}{{ end }}
+  {{ if and $label (not (in $statusLabels $label)) }}
+    {{ $statusLabels = $statusLabels | append $label }}
+  {{ end }}
+{{ end }}
+{{/* Fixed, meaningful order (Granted, Filed, Pending), then anything else. */}}
+{{ $ordered := slice }}
+{{ range slice "Granted" "Filed" "Pending" }}{{ if in $statusLabels . }}{{ $ordered = $ordered | append . }}{{ end }}{{ end }}
+{{ range sort $statusLabels }}{{ if not (in $ordered .) }}{{ $ordered = $ordered | append . }}{{ end }}{{ end }}
+{{ $statusLabels = $ordered }}
+
+{{/* Same 2-column .layout-with-toc grid as Publications, so the content
+     column sits flush-left. The right column holds a status filter (Filed
+     / Pending, drawn from real front-matter) since there's no filing-date
+     data to group by year the way Publications does. */}}
+<div class="layout-with-toc">
+    <div class="publications-content">
+        <header class="section-header">
+            <h1 class="section-header__title">{{ .Title }}</h1>
+            {{ with .Description }}
+            <p class="section-header__description">{{ . }}</p>
+            {{ end }} {{ with .Content }}
+            <div class="section-header__content">{{ . }}</div>
+            {{ end }}
+        </header>
+
+        {{ if $patents }}
+        <section class="publications-year">
+            <header class="publications-year__header">
+                <span class="publications-year__count" id="patents-count">{{ len $patents }} patent{{ if ne (len $patents) 1 }}s{{ end }}</span>
+            </header>
+            <div class="publications-list" id="patents-list">
+                {{ range $patents }} {{ partial "patent-item.html" . }} {{ end }}
+            </div>
+            <p class="list__empty" id="patents-filter-empty" hidden>No patents match this filter.</p>
+        </section>
+        {{ else }}
+        <p class="list__empty">No patents listed yet.</p>
+        {{ end }}
+    </div>
+
+    {{ if $statusLabels }}
+    <aside class="publications-sidebar" aria-label="Filter patents">
+        <div class="patents-filter" id="patents-filter">
+            <p class="patents-filter__label">Filter by status</p>
+            <div class="patents-filter__chips" role="group" aria-label="Status">
+                <button type="button" class="patents-filter__chip is-active" data-status-filter="all">All</button>
+                {{ range $statusLabels }}
+                <button type="button" class="patents-filter__chip" data-status-filter="{{ . }}">{{ . }}</button>
+                {{ end }}
+            </div>
+        </div>
+    </aside>
+    {{ end }}
+</div>
+
+<style>
+    .publications-content {
+        max-width: var(--max-width-content);
+    }
+
+    /* Publications' own list.html sets this same rule (title link = plain
+       text color, accent only on hover) in its page-scoped <style> block,
+       but that block only renders on the Papers page - Patents never had
+       it, so a patent title fell back to the browser's plain global link
+       color (= accent) whenever that patent happened to have a link, and
+       stayed plain-text for every patent without one. Same fix, applied
+       here too, so title coloring no longer depends on which patents
+       happen to have a link on file. */
+    .publication__title a {
+        color: var(--color-text);
+        text-decoration: none;
+        transition: color var(--duration-fast) var(--ease-out);
+    }
+
+    .publication__title a:hover {
+        color: var(--color-accent);
+    }
+
+    {{/* Same "phantom pager" specificity tie this project already hit and
+         fixed once for .pagination (see blog's list.html): main.css's own
+         .publication { display: grid; ... } rule and the browser's UA
+         `[hidden] { display: none }` rule are equal-specificity author vs.
+         UA rules, and author rules always win regardless of source order -
+         so toggling `hidden` on a .publication from the status filter
+         below would silently do nothing without this override. */}}
+    .publication[hidden] {
+        display: none;
+    }
+
+    /* Sidebar - same sticky treatment as Blog/Projects' filter sidebars,
+       never hidden on narrow screens since it's functional filter UI. */
+    .publications-sidebar {
+        position: sticky;
+        top: calc(var(--header-height) + var(--sp-8));
+        max-height: calc(100vh - var(--header-height) - var(--sp-16));
+        overflow-y: auto;
+    }
+
+    @media (max-width: 1099px) {
+        .publications-sidebar {
+            position: static;
+            max-height: none;
+        }
+    }
+
+    .patents-filter__label {
+        font-size: var(--fs-xs);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--color-text-muted);
+        margin-bottom: var(--sp-3);
+    }
+
+    .patents-filter__chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--sp-2);
+    }
+
+    .patents-filter__chip {
+        font-family: var(--font-sans);
+        font-size: var(--fs-xs);
+        padding: var(--sp-1) var(--sp-3);
+        color: var(--color-text-secondary);
+        background: var(--color-bg-alt);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-full, 999px);
+        cursor: pointer;
+        transition: all var(--duration-fast) var(--ease-out);
+    }
+
+    .patents-filter__chip:hover {
+        border-color: var(--color-accent);
+        color: var(--color-accent);
+    }
+
+    .patents-filter__chip.is-active {
+        background: var(--color-accent);
+        color: white;
+        border-color: var(--color-accent);
+    }
+
+    /* Status chip inside each patent row: same pill as the sidebar
+       "Filter by status" chips (Round 24); clicking it applies that filter.
+       Nudged to sit on the author/number line. */
+    .publication__meta .patent-status-chip {
+        margin-left: var(--sp-2);
+        line-height: 1.4;
+        vertical-align: baseline;
+    }
+</style>
+
+{{ if $statusLabels }}
+<script>
+(function () {
+  var filterBar = document.getElementById('patents-filter');
+  if (!filterBar) return;
+
+  var btns = Array.prototype.slice.call(filterBar.querySelectorAll('[data-status-filter]'));
+  var items = Array.prototype.slice.call(document.querySelectorAll('#patents-list .publication'));
+  var emptyEl = document.getElementById('patents-filter-empty');
+
+  btns.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var status = btn.getAttribute('data-status-filter');
+      btns.forEach(function (b) { b.classList.toggle('is-active', b === btn); });
+
+      var visibleCount = 0;
+      items.forEach(function (item) {
+        var visible = status === 'all' || item.getAttribute('data-status') === status;
+        item.hidden = !visible;
+        if (visible) visibleCount++;
+      });
+
+      if (emptyEl) emptyEl.hidden = visibleCount > 0;
+      rowChips.forEach(function (c) {
+        c.classList.toggle('is-active', c.getAttribute('data-status-chip') === status);
+      });
+    });
+  });
+
+  // Status chips inside each patent row act like the sidebar chips; clicking
+  // the active one again goes back to All.
+  var rowChips = Array.prototype.slice.call(document.querySelectorAll('#patents-list .patent-status-chip'));
+  rowChips.forEach(function (c) {
+    c.addEventListener('click', function () {
+      var st = c.getAttribute('data-status-chip');
+      var target = c.classList.contains('is-active') ? 'all' : st;
+      var side = btns.filter(function (b) { return b.getAttribute('data-status-filter') === target; })[0];
+      if (side) side.click();
+    });
+  });
+})();
+</script>
+{{ end }}
+{{ end }}

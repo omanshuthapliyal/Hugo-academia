@@ -1,0 +1,12 @@
+{{/* Renders a comma-separated author list with the site owner's own name
+     bolded and every co-author dimmed to a neutral gray, so authorship
+     position (1st, 2nd, ...) is visible at a glance without having to
+     re-read every name. Shared by publication-item.html and
+     patent-item.html so both lists stay in sync.
+
+     Usage: {{ partial "author-list.html" (dict "authors" .Params.authors) }}
+     Optionally override whose name gets highlighted:
+     {{ partial "author-list.html" (dict "authors" .Params.authors "self" "Some Other Name") }} */}}
+{{ $authors := .authors }}
+{{ $self := .self | default "Omanshu Thapliyal" }}
+{{ range $i, $a := $authors }}{{ if $i }}, {{ end }}{{ if eq $a $self }}<span class="author-list__self">{{ $a }}</span>{{ else }}<span class="author-list__other">{{ $a }}</span>{{ end }}{{ end }}

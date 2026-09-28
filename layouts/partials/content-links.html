@@ -1,0 +1,123 @@
+{{/* Shared "more info" icon-button row - config-driven off front matter, so
+     one place controls every place a paper/project can show links to its
+     blog post, code, slides, video, PDF, DOI, or website. Used by
+     publication-item.html and project-card.html (the compact list/grid
+     cards) and _default/single.html (the item's own page) so all three stay
+     in sync automatically if a new link type is ever added here - add one
+     `{{ with .Params.x }}` block below and it appears everywhere at once.
+
+     Not every field applies to every content type (papers don't set
+     `website`, projects don't set `doi`) - that's fine, each button is
+     independently conditional on its own field being present, so a page
+     with none of these set renders nothing at all.
+
+     `blog_post` is authored as just the post's own slug under content/blog/
+     (e.g. blog_post: "hrm-part-2"), not a full URL like the other fields -
+     it's resolved through .Site.GetPage so the link can never go stale if
+     the post's permalink ever changes. If the slug doesn't match a real
+     post, GetPage returns nil and the button silently doesn't render,
+     rather than emitting a broken link. */}}
+{{ $page := . }}
+{{ $blogPost := "" }}
+{{ with $page.Params.blog_post }}
+  {{ with $page.Site.GetPage (printf "blog/%s" .) }}
+    {{ $blogPost = . }}
+  {{ end }}
+{{ end }}
+
+{{ $hasLinks := or $page.Params.doi $page.Params.pdf $page.Params.code $page.Params.slides $page.Params.poster $page.Params.video $blogPost $page.Params.website }}
+
+{{ if $hasLinks }}
+<div class="content-links">
+    {{ with $page.Params.doi }}
+    <a href="https://doi.org/{{ . }}" class="content-links__link" title="DOI" target="_blank" rel="noopener">
+        {{ partial "icons/icons.html" "external-link" }}
+        <span class="visually-hidden">DOI</span>
+    </a>
+    {{ end }}
+    {{ with $page.Params.pdf }}
+    <a href="{{ . }}" class="content-links__link" title="PDF" target="_blank" rel="noopener">
+        {{ partial "icons/icons.html" "download" }}
+        <span class="visually-hidden">PDF</span>
+    </a>
+    {{ end }}
+    {{ with $page.Params.code }}
+    {{ $codeLabel := $page.Params.code_label | default "Code" }}
+    <a href="{{ . }}" class="content-links__link" title="{{ $codeLabel }}" target="_blank" rel="noopener">
+        {{ partial "icons/icons.html" "github" }}
+        <span class="visually-hidden">{{ $codeLabel }}</span>
+    </a>
+    {{ end }}
+    {{ with $page.Params.slides }}
+    <a href="{{ . }}" class="content-links__link" title="Slides" target="_blank" rel="noopener">
+        {{ partial "icons/icons.html" "slides" }}
+        <span class="visually-hidden">Slides</span>
+    </a>
+    {{ end }}
+    {{ with $page.Params.poster }}
+    <a href="{{ . }}" class="content-links__link" title="Poster" target="_blank" rel="noopener">
+        {{ partial "icons/icons.html" "slides" }}
+        <span class="visually-hidden">Poster</span>
+    </a>
+    {{ end }}
+    {{ with $page.Params.video }}
+    <a href="{{ . }}" class="content-links__link" title="Video" target="_blank" rel="noopener">
+        {{ partial "icons/icons.html" "youtube" }}
+        <span class="visually-hidden">Video</span>
+    </a>
+    {{ end }}
+    {{ with $blogPost }}
+    <a href="{{ .Permalink }}" class="content-links__link" title="Blog post">
+        {{ partial "icons/icons.html" "file-text" }}
+        <span class="visually-hidden">Blog post</span>
+    </a>
+    {{ end }}
+    {{ with $page.Params.website }}
+    <a href="{{ . }}" class="content-links__link" title="Website" target="_blank" rel="noopener">
+        {{ partial "icons/icons.html" "external-link" }}
+        <span class="visually-hidden">Website</span>
+    </a>
+    {{ end }}
+</div>
+
+<style>
+    /* Scoped once here rather than duplicated per host template - this
+       partial is fully self-contained (markup + style), so it renders
+       identically wherever it's dropped in. z-index:2 matches
+       project-card.html's own stretched full-card overlay link (z-index:1)
+       so these buttons stay independently clickable there; harmless in
+       contexts (publication list, single pages) that have no such overlay. */
+    .content-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--sp-1);
+    }
+
+    .content-links__link {
+        position: relative;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        color: var(--color-text-muted);
+        background: transparent;
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-sm);
+        transition: all var(--duration-fast) var(--ease-out);
+        text-decoration: none;
+    }
+
+    .content-links__link:hover {
+        color: var(--color-accent);
+        border-color: var(--color-accent);
+        background: var(--color-bg-alt);
+    }
+
+    .content-links__link svg {
+        width: 16px;
+        height: 16px;
+    }
+</style>
+{{ end }}

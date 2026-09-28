@@ -1,0 +1,497 @@
+{{ define "main" }}
+{{/* Project case-study page - deliberately NOT the blog/article template
+     (_default/single.html). A project page is scanned, not read top to
+     bottom: a recruiter wants role / org / period / stack at a glance, a
+     researcher wants the problem, the approach, the numbers and the linked
+     papers/patents. So this layout is:
+
+       header      status + period + org, title, one-line summary, labeled links
+       aside       "On this page" nav, then "Project facts" card (role, org,
+                   period, team, stack, topics, outputs) - sticky on
+                   desktop. Status lives in the header only; code/paper/etc.
+                   are link buttons, not facts.
+       main        hero figure/video -> key-result stat tiles -> numbered
+                   body sections -> related papers/patents/posts -> prev/next
+
+     Every block is conditional on its own front-matter field, so a project
+     that sets none of the new fields still renders cleanly (header + body).
+
+     Optional front matter this template understands (all additive):
+       end_date, role, organization, team: [..], stack: [..]
+       highlights: [{value: "10-50 ms", label: "..."}]
+       related: ["patents/patent-07", "papers/pub17", "blog/some-post"]
+       image, image_alt, image_caption, hero_video (mp4 path), hero_poster,
+       hero_image (e.g. a GIF), hero_still, hero_alt
+       paper, patent (URL or content path), demo, code, slides, video, pdf, blog_post
+       resources: [{label: "...", url: "..."}]  external pages (lab pages,
+         articles, project sites) - listed under "External resources" at the
+         bottom, NOT as buttons under the title. Legacy `website:` is treated
+         the same way.
+       links: [{label: "...", url: "..."}]   (anything else) */}}
+
+{{ $p := .Params }}
+{{ $isActive := eq $p.status "active" }}
+
+{{/* Period: "2023 – Present" / "2023 – 2025" / "2023" */}}
+{{ $startY := "" }}{{ with $p.start_date }}{{ $startY = time.Format "2006" . }}{{ end }}
+{{ $endY := "" }}{{ with $p.end_date }}{{ $endY = time.Format "2006" . }}{{ end }}
+{{ $period := "" }}
+{{ if and $startY $endY }}
+  {{ if eq $startY $endY }}{{ $period = $startY }}{{ else }}{{ $period = printf "%s – %s" $startY $endY }}{{ end }}
+{{ else if and $startY $isActive }}
+  {{ $period = printf "%s – Present" $startY }}
+{{ else if $startY }}
+  {{ $period = $startY }}
+{{ end }}
+
+{{/* Resolve related outputs up front so the aside can count them */}}
+{{ $related := slice }}
+{{ range $p.related }}
+  {{ with site.GetPage . }}{{ $related = $related | append . }}{{ end }}
+{{ end }}
+
+{{/* External resources: `resources` list + legacy `website` (label = host) */}}
+{{ $resources := slice }}
+{{ range $p.resources }}
+  {{ if .url }}{{ $resources = $resources | append (dict "label" (.label | default (urls.Parse .url).Host) "url" .url) }}{{ end }}
+{{ end }}
+{{ with $p.website }}{{ $resources = $resources | append (dict "label" (urls.Parse .).Host "url" .) }}{{ end }}
+
+{{ $hasToc := gt (len .TableOfContents) 100 }}
+
+<div class="project-page">
+  {{/* ------------------------------------------------------------ header */}}
+  <header class="project-head">
+    <a class="project-head__back" href="{{ "projects/" | relURL }}">
+      {{ partial "icons/icons.html" "arrow-left" }}<span>All projects</span>
+    </a>
+
+    <div class="project-head__meta">
+      <span class="project-status project-status--{{ $p.status | default "other" }}">
+        <span class="status-dot {{ if $isActive }}status-dot--active{{ else }}status-dot--completed{{ end }}"></span>
+        {{ if $isActive }}{{ i18n "status_active" | default "Active" }}{{ else if eq $p.status "completed" }}{{ i18n "status_completed" | default "Completed" }}{{ else }}{{ $p.status | default "Project" | title }}{{ end }}
+      </span>
+      {{ with $period }}<span class="project-head__sep" aria-hidden="true">·</span><span>{{ . }}</span>{{ end }}
+      {{ with $p.organization }}<span class="project-head__sep" aria-hidden="true">·</span><span>{{ . }}</span>{{ end }}
+    </div>
+
+    <h1 class="project-head__title">{{ .Title }}</h1>
+    {{ with .Description }}<p class="project-head__lead">{{ . }}</p>{{ end }}
+
+    {{/* Labeled buttons (not icon-only like the list cards): on its own
+         page a project's outputs are the point, so say what each one is. */}}
+    {{/* paper / patent may be an external URL or a site content path
+         (e.g. "patents/patent-07"), resolved so the button can't go stale. */}}
+    {{ $paperHref := "" }}{{ with $p.paper }}{{ if hasPrefix . "http" }}{{ $paperHref = . }}{{ else }}{{ with site.GetPage . }}{{ $paperHref = .RelPermalink }}{{ end }}{{ end }}{{ end }}
+    {{ $patentHref := "" }}{{ with $p.patent }}{{ if hasPrefix . "http" }}{{ $patentHref = . }}{{ else }}{{ with site.GetPage . }}{{ $patentHref = .RelPermalink }}{{ end }}{{ end }}{{ end }}
+    {{ $blogPost := "" }}
+    {{ with $p.blog_post }}{{ with site.GetPage (printf "blog/%s" .) }}{{ $blogPost = . }}{{ end }}{{ end }}
+    {{ if or $paperHref $patentHref $p.pdf $p.code $p.demo $p.slides $p.video $blogPost $p.links }}
+    <div class="project-links">
+      {{ with $paperHref }}<a class="project-link project-link--primary" href="{{ . }}"{{ if hasPrefix . "http" }} target="_blank" rel="noopener"{{ end }}>{{ partial "icons/icons.html" "file-text" }}Paper</a>{{ end }}
+      {{ with $p.pdf }}<a class="project-link" href="{{ . }}" target="_blank" rel="noopener">{{ partial "icons/icons.html" "download" }}PDF</a>{{ end }}
+      {{ with $patentHref }}<a class="project-link" href="{{ . }}"{{ if hasPrefix . "http" }} target="_blank" rel="noopener"{{ end }}>{{ partial "icons/icons.html" "lightbulb" }}Patent</a>{{ end }}
+      {{ with $p.code }}<a class="project-link" href="{{ . }}" target="_blank" rel="noopener">{{ partial "icons/icons.html" "github" }}Code</a>{{ end }}
+      {{ with $p.demo }}<a class="project-link" href="{{ . }}" target="_blank" rel="noopener">{{ partial "icons/icons.html" "cpu" }}Demo</a>{{ end }}
+      {{ with $p.slides }}<a class="project-link" href="{{ . }}" target="_blank" rel="noopener">{{ partial "icons/icons.html" "slides" }}Slides</a>{{ end }}
+      {{ with $p.video }}<a class="project-link" href="{{ . }}" target="_blank" rel="noopener">{{ partial "icons/icons.html" "youtube" }}Video</a>{{ end }}
+      {{ with $blogPost }}<a class="project-link" href="{{ .RelPermalink }}">{{ partial "icons/icons.html" "book" }}Blog post</a>{{ end }}
+      {{ range $p.links }}<a class="project-link" href="{{ .url }}" target="_blank" rel="noopener">{{ partial "icons/icons.html" "external-link" }}{{ .label }}</a>{{ end }}
+    </div>
+    {{ end }}
+  </header>
+
+  {{/* ------------------------------------------------------------ aside */}}
+  <aside class="project-aside" aria-label="Project facts">
+    <div class="project-aside__sticky">
+      {{ if $hasToc }}
+      <nav class="project-toc" aria-label="{{ i18n "on_this_page" | default "On this page" }}">
+        <p class="toc__title">{{ i18n "on_this_page" | default "On this page" }}</p>
+        <div class="toc__nav" id="toc-nav">{{ .TableOfContents }}</div>
+      </nav>
+      {{ end }}
+
+      <section class="project-facts">
+        <h2 class="project-facts__title">Project facts</h2>
+        <dl class="project-facts__list">
+          {{ with $p.role }}<div><dt>Role</dt><dd>{{ . }}</dd></div>{{ end }}
+          {{ with $p.organization }}<div><dt>Organization</dt><dd>{{ . }}</dd></div>{{ end }}
+          {{ with $period }}<div><dt>Period</dt><dd>{{ . }}</dd></div>{{ end }}
+          {{ with $p.team }}<div><dt>Team</dt><dd>{{ delimit . ", " }}</dd></div>{{ end }}
+          {{ with $p.stack }}
+          <div><dt>Stack</dt><dd class="project-facts__chips">{{ range . }}<a class="project-chip project-chip--stack" href="{{ "projects/" | relURL }}?stack={{ . | urlquery }}" title="All projects using {{ . }}">{{ . }}</a>{{ end }}</dd></div>
+          {{ end }}
+          {{ with $p.tags }}
+          <div><dt>Topics</dt><dd class="project-facts__chips">{{ range . }}<a class="project-chip" href="{{ "projects/" | relURL }}?topic={{ partial "topic-slug.html" . | urlquery }}" title="All projects in this topic">{{ . }}</a>{{ end }}</dd></div>
+          {{ end }}
+          {{ with $resources }}<div><dt>Resources</dt><dd><a href="#external-resources">{{ len . }} external {{ cond (eq (len .) 1) "link" "links" }} ↓</a></dd></div>{{ end }}
+          {{ with $related }}<div><dt>Outputs</dt><dd><a href="#related-outputs">{{ len . }} linked {{ cond (eq (len .) 1) "output" "outputs" }} ↓</a></dd></div>{{ end }}
+        </dl>
+      </section>
+
+    </div>
+  </aside>
+
+  {{/* ------------------------------------------------------------ main */}}
+  <div class="project-main">
+    {{ if or $p.hero_video $p.hero_image $p.image }}
+    <figure class="project-hero">
+      {{ if $p.hero_video }}
+        {{/* hero_poster (same framing as the video) wins over image, since
+             image is the 16:9 list-card thumbnail and may be a different
+             crop/aspect than the clip itself. */}}
+        {{ $poster := $p.hero_poster | default $p.image }}
+        <video class="project-hero__media project-hero__video" autoplay muted loop playsinline preload="metadata"
+               {{ with $poster }}poster="{{ . | relURL }}"{{ end }}
+               aria-label="{{ $p.hero_alt | default (printf "%s demo" .Title) }}">
+          {{/* A same-named .webm next to the .mp4 (in static/) is offered
+               first: smaller, and plays in Chromium builds without H.264. */}}
+          {{ $webm := replaceRE `\.mp4$` ".webm" $p.hero_video }}
+          {{ if and (ne $webm $p.hero_video) (os.FileExists (printf "static%s" $webm)) }}
+          <source src="{{ $webm | relURL }}" type="video/webm">
+          {{ end }}
+          <source src="{{ $p.hero_video | relURL }}" type="video/mp4">
+        </video>
+      {{ else if $p.hero_image }}
+        {{/* hero_image: e.g. an animated GIF that differs from the list-card
+             `image`. hero_still (optional) is shown instead to visitors who
+             ask for reduced motion, since a GIF can't be paused. */}}
+        <picture>
+          {{ with $p.hero_still }}<source srcset="{{ . | relURL }}" media="(prefers-reduced-motion: reduce)">{{ end }}
+          <img class="project-hero__media" src="{{ $p.hero_image | relURL }}" alt="{{ $p.hero_alt | default ($p.image_alt | default .Title) }}" loading="eager" decoding="async">
+        </picture>
+      {{ else }}
+        <img class="project-hero__media" src="{{ $p.image | relURL }}" alt="{{ $p.image_alt | default .Title }}" loading="eager">
+      {{ end }}
+      {{ with $p.image_caption }}<figcaption>{{ . | markdownify }}</figcaption>{{ end }}
+    </figure>
+    {{ end }}
+
+    {{ with $p.highlights }}
+    <section class="project-stats" aria-label="Key results">
+      {{ range . }}
+      <div class="project-stat">
+        <span class="project-stat__value">{{ .value }}</span>
+        <span class="project-stat__label">{{ .label | markdownify }}</span>
+      </div>
+      {{ end }}
+    </section>
+    {{ end }}
+
+    <div class="article__content project-body content">
+      {{ .Content }}
+    </div>
+
+    {{ with $related }}
+    <section class="project-related" id="related-outputs">
+      <h2 class="project-related__title">Related outputs</h2>
+      <ul class="project-related__list">
+        {{ range . }}
+        {{ $kind := "Post" }}{{ if eq .Section "papers" }}{{ $kind = "Paper" }}{{ else if eq .Section "patents" }}{{ $kind = "Patent" }}{{ else if eq .Section "projects" }}{{ $kind = "Project" }}{{ end }}
+        <li class="project-related__item">
+          <span class="project-related__kind project-related__kind--{{ lower $kind }}">{{ $kind }}</span>
+          <a class="project-related__link" href="{{ .RelPermalink }}">{{ .Title }}</a>
+          <span class="project-related__detail">
+            {{- if eq $kind "Paper" -}}{{ with .Params.venue }}{{ . }}{{ end }}{{ with .Params.year }}, {{ . }}{{ end }}
+            {{- else if eq $kind "Patent" -}}{{ with .Params.patent_number }}Application {{ . }}{{ end }}
+            {{- else if eq $kind "Post" -}}{{ .Date.Format "January 2006" }}{{- end -}}
+          </span>
+        </li>
+        {{ end }}
+      </ul>
+    </section>
+    {{ end }}
+
+    {{ with $resources }}
+    <section class="project-related" id="external-resources">
+      <h2 class="project-related__title">External resources</h2>
+      <ul class="project-related__list">
+        {{ range . }}
+        <li class="project-related__item">
+          <span class="project-related__kind project-related__kind--external">Link</span>
+          <a class="project-related__link" href="{{ .url }}" target="_blank" rel="noopener">{{ .label }} <span aria-hidden="true">↗</span></a>
+          <span class="project-related__detail">{{ (urls.Parse .url).Host | strings.TrimPrefix "www." }}</span>
+        </li>
+        {{ end }}
+      </ul>
+    </section>
+    {{ end }}
+
+    <nav class="project-pager" aria-label="More projects">
+      {{ with .PrevInSection }}<a class="project-pager__link" href="{{ .RelPermalink }}"><span class="project-pager__dir">← Previous project</span><span class="project-pager__title">{{ .Title }}</span></a>{{ else }}<span></span>{{ end }}
+      {{ with .NextInSection }}<a class="project-pager__link project-pager__link--next" href="{{ .RelPermalink }}"><span class="project-pager__dir">Next project →</span><span class="project-pager__title">{{ .Title }}</span></a>{{ end }}
+    </nav>
+  </div>
+</div>
+
+<script>
+  /* Hero loop: honour reduced-motion (no autoplay, show controls instead),
+     and let a click pause/resume it for anyone reading alongside it. */
+  (function () {
+    var v = document.querySelector('.project-hero__video');
+    if (!v) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      v.removeAttribute('autoplay'); v.pause(); v.controls = true; return;
+    }
+    v.addEventListener('click', function () { v.paused ? v.play() : v.pause(); });
+  })();
+</script>
+
+<style>
+  .project-page {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "head" "aside" "main";
+    gap: var(--sp-8);
+    max-width: var(--max-width-wide);
+    margin: 0 auto;
+    padding: 0 var(--sp-6);
+  }
+  .project-head  { grid-area: head;  max-width: var(--max-width-content); }
+  .project-aside { grid-area: aside; }
+  .project-main  { grid-area: main;  max-width: var(--max-width-content); min-width: 0; }
+
+  @media (min-width: 1100px) {
+    .project-page {
+      grid-template-columns: minmax(0, 1fr) 280px;
+      grid-template-areas: "head aside" "main aside";
+      grid-template-rows: auto 1fr;
+      column-gap: var(--sp-12);
+      row-gap: var(--sp-8);
+    }
+    .project-aside__sticky {
+      position: sticky;
+      top: calc(var(--header-height) + var(--sp-6));
+      /* nav stays in view; if the facts card below it is taller than the
+         window, the column scrolls on its own instead of being cut off */
+      max-height: calc(100vh - var(--header-height) - var(--sp-12));
+      overflow-y: auto;
+      scrollbar-width: thin;
+    }
+  }
+
+  /* header */
+  .project-head__back {
+    display: inline-flex; align-items: center; gap: var(--sp-2);
+    font-size: var(--fs-sm); color: var(--color-text-muted);
+    text-decoration: none; margin-bottom: var(--sp-6);
+  }
+  .project-head__back:hover { color: var(--color-accent); }
+  .project-head__back svg { width: 14px; height: 14px; }
+
+  .project-head__meta {
+    display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
+    font-size: var(--fs-sm); color: var(--color-text-muted);
+    margin-bottom: var(--sp-3);
+  }
+  .project-head__sep { color: var(--color-text-faint); }
+  .project-status {
+    display: inline-flex; align-items: center; gap: var(--sp-2);
+    font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase;
+    letter-spacing: var(--ls-wider); color: var(--color-text-secondary);
+  }
+  .project-status .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .project-status .status-dot--active {
+    background: var(--color-success);
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+  }
+  .project-status .status-dot--completed { background: var(--color-text-muted); }
+
+  .project-head__title {
+    font-size: var(--fs-4xl); font-weight: 500;
+    line-height: var(--lh-tight); letter-spacing: var(--ls-tight);
+    margin-bottom: var(--sp-4); text-wrap: balance;
+  }
+  .project-head__lead {
+    font-size: var(--fs-xl); line-height: var(--lh-normal);
+    color: var(--color-text-secondary); text-wrap: pretty;
+  }
+
+  .project-links { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-6); }
+  .project-link {
+    display: inline-flex; align-items: center; gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-4);
+    font-size: var(--fs-sm); font-weight: 500;
+    color: var(--color-text); text-decoration: none;
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border); border-radius: var(--radius-full);
+    transition: all var(--duration-fast) var(--ease-out);
+  }
+  .project-link svg { width: 15px; height: 15px; }
+  .project-link:hover { border-color: var(--color-accent); color: var(--color-accent); }
+  .project-link--primary { background: var(--color-accent); border-color: var(--color-accent); color: #fff; }
+  .project-link--primary:hover { background: var(--color-accent-hover); color: #fff; }
+
+  /* Project facts - same visual language as the Blog page's right column
+     (search / Cards-Table toggle / "Filter by tag" chips): no card box,
+     sits on the page background; small bold uppercase labels; values and
+     chips on --color-bg-alt with a hairline border, chips fully rounded. */
+  .project-toc + .project-facts { padding-top: var(--sp-6); border-top: 1px solid var(--color-border-subtle); }
+  .project-facts__title,
+  .project-facts__list dt {
+    font-family: var(--font-sans); font-size: var(--fs-xs); font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--color-text-muted);
+  }
+  .project-facts__title { margin: 0 0 var(--sp-4); padding: 0; border: 0; line-height: var(--lh-normal); }
+  .project-facts__list { margin: 0; display: grid; gap: var(--sp-5); }
+  .project-facts__list > div { display: grid; gap: var(--sp-2); }
+  .project-facts__list dd { margin: 0; font-size: var(--fs-sm); color: var(--color-text); line-height: var(--lh-snug); }
+  .project-facts__chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+  .project-chip,
+  .project-facts__chips .tag {
+    display: inline-block;
+    font-family: var(--font-sans); font-size: var(--fs-xs); line-height: 1.4;
+    padding: var(--sp-1) var(--sp-3);
+    color: var(--color-text-secondary);
+    background: var(--color-bg-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-full, 999px);
+    text-decoration: none;
+    transition: all var(--duration-fast) var(--ease-out);
+  }
+  a.project-chip:hover { border-color: var(--color-accent); color: var(--color-accent); }
+  /* Stack chips use the secondary accent, matching "Filter by stack" on
+     the Projects list, so the two chip kinds read differently. */
+  .project-chip--stack { color: var(--color-accent-2); background: var(--color-accent-2-light); border-color: var(--color-accent-2-border); }
+  a.project-chip--stack:hover { color: var(--color-accent-2); border-color: var(--color-accent-2); }
+  .project-facts__list dd a:not(.project-chip) { color: var(--color-accent); text-decoration: none; }
+
+  .project-toc { margin-bottom: var(--sp-6); }
+  .project-toc .toc__title {
+    font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.05em; color: var(--color-text-muted);
+    margin-bottom: var(--sp-3);
+  }
+  .project-toc .toc__nav { border-left: 1px solid var(--color-border); }
+  .project-toc ul { list-style: none; margin: 0; padding: 0; }
+  .project-toc li { margin: 0; }
+  .project-toc a {
+    display: block; padding: var(--sp-1) var(--sp-4); margin-left: -1px;
+    font-size: var(--fs-sm); color: var(--color-text-muted);
+    border-left: 2px solid transparent; text-decoration: none;
+  }
+  .project-toc a:hover { color: var(--color-text); }
+  .project-toc a.toc-active { color: var(--color-accent); border-left-color: var(--color-accent); font-weight: 500; }
+  /* Small screens: facts card sits between the header and the body, so
+     pack the short rows two-up to keep it from pushing the story down. */
+  @media (max-width: 1099px) {
+    .project-facts__list { grid-template-columns: 1fr 1fr; column-gap: var(--sp-4); }
+    .project-facts__list > div:has(.project-facts__chips) { grid-column: 1 / -1; }
+  }
+  /* Small screens: same nav, laid out as a wrapped row of links so it
+     stays above the fold instead of a tall vertical list. */
+  @media (max-width: 1099px) {
+    .project-toc .toc__nav { border-left: 0; }
+    .project-toc ul { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); }
+    .project-toc a {
+      padding: var(--sp-1) var(--sp-3); margin: 0;
+      border: 1px solid var(--color-border); border-radius: var(--radius-full);
+      font-size: var(--fs-xs);
+    }
+    .project-toc a.toc-active { border-color: var(--color-accent); }
+  }
+
+  /* hero */
+  /* Sits on a quiet panel and is capped by viewport height, so both a
+     16:9 figure (fills the width) and a portrait screen capture (centered,
+     ~75% of the viewport tall) read well without special-casing either. */
+  .project-hero {
+    margin: 0 0 var(--sp-8);
+    padding: var(--sp-4);
+    background: var(--color-bg-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+  }
+  .project-hero__media {
+    display: block; margin: 0 auto;
+    width: auto; max-width: 100%; height: auto;
+    max-height: min(75vh, 760px);
+    border-radius: var(--radius-md);
+  }
+  .project-hero__video { cursor: pointer; }
+  .project-hero figcaption {
+    margin-top: var(--sp-3); font-size: var(--fs-sm);
+    color: var(--color-text-muted); text-align: center;
+  }
+
+  /* key results - optional, compact one-line items; most projects won't
+     set `highlights` at all */
+  .project-stats {
+    display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-6);
+    margin-bottom: var(--sp-8); padding: var(--sp-3) 0;
+    border-top: 1px solid var(--color-border-subtle);
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+  .project-stat { display: flex; align-items: baseline; gap: var(--sp-2); font-size: var(--fs-sm); }
+  .project-stat__value { font-weight: 600; color: var(--color-text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .project-stat__label { color: var(--color-text-muted); }
+  .project-stat__label p { margin: 0; display: inline; }
+
+  /* body: numbered sections read as a case study, not an essay */
+  .project-body { counter-reset: psec; }
+  .project-body > h2 {
+    counter-increment: psec;
+    display: flex; align-items: baseline; gap: var(--sp-3);
+    font-size: var(--fs-2xl);
+    margin-top: var(--sp-12);
+  }
+  .project-body > h2:first-child { margin-top: 0; }
+  .project-body > h3 { font-size: var(--fs-xl); margin-top: var(--sp-8); } /* sub-sections inside a numbered section */
+  /* lists of works / research questions use an en-dash marker; Outcome lists keep the round bullet */
+  .project-body > ul { list-style-type: "\2013\00a0\00a0"; }
+  .project-body > ul > li::marker { color: var(--color-accent); font-weight: 600; }
+  .project-body > ul > li + li { margin-top: var(--sp-3); }
+  .project-body > ul ul { list-style-type: disc; margin-top: var(--sp-2); }
+  .project-body > h2#outcome ~ ul { list-style-type: disc; }
+  .project-body > h2#outcome ~ ul > li::marker { color: inherit; font-weight: inherit; }
+  .project-body > h2::before {
+    content: counter(psec, decimal-leading-zero);
+    font-family: var(--font-mono); font-size: var(--fs-sm); font-weight: 500;
+    color: var(--color-accent); letter-spacing: var(--ls-wide);
+  }
+  .project-body img, .project-body video, .project-body svg { max-width: 100%; height: auto; border-radius: var(--radius-md); }
+  .project-body figure img { margin-inline: auto; } /* figures set narrower with width="…" stay centered */
+
+  /* related outputs */
+  .project-related {
+    margin-top: var(--sp-12); padding-top: var(--sp-6);
+    border-top: 1px solid var(--color-border-subtle);
+  }
+  .project-related__title { font-size: var(--fs-2xl); margin-bottom: var(--sp-4); }
+  .project-related { border-top: 0; padding-top: 0; }
+  .project-related__list { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--sp-3); }
+  .project-related__item {
+    display: grid; grid-template-columns: auto 1fr; column-gap: var(--sp-3); row-gap: var(--sp-1);
+    align-items: baseline; padding: var(--sp-4);
+    border: 1px solid var(--color-border); border-radius: var(--radius-md);
+    background: var(--color-card-bg);
+  }
+  .project-related__kind {
+    font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: var(--ls-wide);
+    padding: 2px var(--sp-2); border-radius: var(--radius-sm);
+    background: var(--color-accent-light); color: var(--color-accent);
+  }
+  .project-related__kind--external { background: var(--color-accent-2-light); color: var(--color-accent-2); }
+  .project-related__link { font-weight: 500; color: var(--color-text); text-decoration: none; }
+  .project-related__link:hover { color: var(--color-accent); }
+  .project-related__detail { grid-column: 2; font-size: var(--fs-sm); color: var(--color-text-muted); }
+  .project-related__detail:empty { display: none; }
+
+  /* pager */
+  .project-pager {
+    display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4);
+    margin-top: var(--sp-12); padding-top: var(--sp-6);
+    border-top: 1px solid var(--color-border-subtle);
+  }
+  .project-pager__link { display: flex; flex-direction: column; gap: var(--sp-1); text-decoration: none; }
+  .project-pager__link--next { text-align: right; grid-column: 2; }
+  .project-pager__dir { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: var(--ls-wide); color: var(--color-text-muted); }
+  .project-pager__title { font-size: var(--fs-sm); color: var(--color-text); }
+  .project-pager__link:hover .project-pager__title { color: var(--color-accent); }
+  @media (max-width: 600px) {
+    .project-pager { grid-template-columns: 1fr; }
+    .project-pager__link--next { grid-column: 1; text-align: left; }
+  }
+</style>
+{{ end }}

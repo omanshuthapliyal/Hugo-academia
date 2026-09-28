@@ -1,16 +1,42 @@
 {{ define "main" }}
 {{/* Single page template with Table of Contents */}}
 
+{{ $isAbout := eq .RelPermalink "/about/" }}
+{{ $isPaper := eq .Section "papers" }}
+{{ $isProject := eq .Section "projects" }}
 {{ $showToc := and (.Site.Params.toc.enable | default true) .TableOfContents }}
 {{ $hasToc := and $showToc (gt (len .TableOfContents) 100) }}
 
-<div class="{{ if $hasToc }}layout-with-toc{{ else }}container{{ end }}">
+{{/* Every top-level section page (Publications/Patents/Projects/Blog) uses
+     the 2-column .layout-with-toc grid so its content sits flush-left with
+     a reserved right-hand column. About shares that grid too - it used to
+     have its real TOC (Hello!/Research Interests) suppressed specifically
+     to avoid the wide layout as a side effect, but now that every section
+     page is already on that same grid, there's no reason to keep hiding
+     it: About's right column gets its own real, already-existing headings
+     instead of sitting empty like Projects/Patents' does. */}}
+{{ $useTwoCol := or $hasToc $isAbout }}
+
+{{/* On About, none of Date/reading-time/word-count render, so the
+     `.article__meta` row would be left as an empty div - which still
+     eats its own margin-bottom and pushes the title down, misaligning
+     "About Me" against the section-header titles (Publications,
+     Patents, ...) that have no such row above them at all. Skip
+     rendering the wrapper entirely when it would have nothing in it. */}}
+{{ $showReadingTime := and (not $isAbout) (.Site.Params.readingTime.enable | default true) }}
+{{ $showWordCount := and (not $isAbout) (gt .WordCount 0) }}
+{{ $hasMeta := or .Date $showReadingTime $showWordCount }}
+
+<div class="{{ if $useTwoCol }}layout-with-toc{{ else }}container{{ end }}">
   
   {{/* Main article content */}}
   <article class="article content">
     {{/* Article header */}}
     <header class="article__header">
-      {{/* Meta information */}}
+      {{/* Meta information - whole row is skipped when nothing in it
+           would render (see $hasMeta above), so it never leaves behind
+           an empty div that pushes the title down. */}}
+      {{ if $hasMeta }}
       <div class="article__meta">
         {{/* Date */}}
         {{ if .Date }}
@@ -33,7 +59,9 @@
           </span>
         {{ end }}
         
-        {{/* Reading time */}}
+        {{/* Reading time / word count - meaningless on a short bio page
+             like About, so skip both there. */}}
+        {{ if not $isAbout }}
         {{ if .Site.Params.readingTime.enable | default true }}
           <span class="article__meta-item">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -43,23 +71,44 @@
             {{ i18n "reading_time" .ReadingTime | default (printf "%d min read" .ReadingTime) }}
           </span>
         {{ end }}
-        
+
         {{/* Word count */}}
         {{ if gt .WordCount 0 }}
           <span class="article__meta-item">
             {{ i18n "word_count" .WordCount | default (printf "%d words" .WordCount) }}
           </span>
         {{ end }}
+        {{ end }}
       </div>
-      
-      {{/* Title */}}
-      <h1 class="article__title">{{ .Title }}</h1>
+      {{ end }}
+
+      {{/* Title - About gets the "page heading" treatment (colored like
+           Publications/Patents/Projects/Blog's h1) since it's a top-level
+           section page wearing this shared template, not a content item.
+           Everything else using this same template - blog posts, and
+           individual paper/patent/project pages - keeps the plain title
+           color; only About needs the modifier. */}}
+      <h1 class="article__title{{ if $isAbout }} article__title--page{{ end }}">{{ .Title }}</h1>
       
       {{/* Description */}}
       {{ with .Description }}
         <p class="article__description">{{ . }}</p>
       {{ end }}
-      
+
+      {{/* Authors / venue - papers only. This page previously showed
+           neither: publication-item.html (the Publications list card)
+           renders them, but a paper's own single page never did, so
+           following its title link led to a page with no author or venue
+           context at all. */}}
+      {{ if $isPaper }}
+        {{ with .Params.authors }}
+          <p class="article__authors">{{ partial "author-list.html" (dict "authors" .) }}</p>
+        {{ end }}
+        {{ with .Params.venue }}
+          <p class="article__venue">{{ . }}</p>
+        {{ end }}
+      {{ end }}
+
       {{/* Tags */}}
       {{ if .Params.tags }}
         <div class="article__tags">
@@ -67,6 +116,27 @@
             <a href="{{ "tags/" | relURL }}{{ . | urlize }}" class="tag">{{ . }}</a>
           {{ end }}
         </div>
+      {{ end }}
+
+      {{/* Keywords - papers only, separate taxonomy from tags (see
+           hugo.yaml). Same clickable-chip treatment as tags above, just
+           linking under /keywords/ instead of /tags/. */}}
+      {{ if and $isPaper .Params.keywords }}
+        <div class="article__tags">
+          {{ range .Params.keywords }}
+            <a href="{{ "keywords/" | relURL }}{{ . | urlize }}" class="tag">{{ . }}</a>
+          {{ end }}
+        </div>
+      {{ end }}
+
+      {{/* More-info buttons: DOI/PDF/code/slides/video/blog post (papers),
+           website/code/slides/video/blog post/pdf (projects) - same
+           partial and same fields as the Publications/Projects list cards,
+           see content-links.html. Fixes the previous dead end where a
+           paper's or project's own page had no way back out to its code,
+           slides, video, etc. */}}
+      {{ if or $isPaper $isProject }}
+        {{ partial "content-links.html" . }}
       {{ end }}
     </header>
     
@@ -108,11 +178,28 @@
 </div>
 
 <style>
+  .article__authors {
+    font-size: var(--fs-base);
+    color: var(--color-text-secondary);
+    margin-top: var(--sp-3);
+  }
+
+  .article__venue {
+    font-size: var(--fs-base);
+    font-style: italic;
+    color: var(--color-text-muted);
+    margin-top: var(--sp-1);
+  }
+
   .article__tags {
     display: flex;
     flex-wrap: wrap;
     gap: var(--sp-2);
     margin-top: var(--sp-4);
+  }
+
+  .article__header .content-links {
+    margin-top: var(--sp-5);
   }
   
   .article__footer {

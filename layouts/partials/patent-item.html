@@ -1,0 +1,49 @@
+{{/* Patent item partial - mirrors publication-item.html's compact layout.
+     patent_number and status are independent: a filed/published patent may
+     have a number with no status badge, and a pending one may have a status
+     badge with no number yet. */}}
+{{/* data-status backs the Patents list page's own filter sidebar: use the
+     real status text when set ("Pending"), otherwise derive "Filed" from
+     having a real patent/application number on file - not a fabricated
+     label, just naming the fact that a number already exists. A patent
+     with neither (no status set yet, no number on file) gets no
+     data-status and only shows up under the sidebar's "All". */}}
+{{/* Status (Round 23): Granted / Filed / Pending.
+       1. explicit `status:` in front matter always wins;
+       2. a number starting with "US" (a US patent/publication number) -> Granted;
+       3. any other number (an application number like 19/075,633) -> Filed;
+       4. no number yet -> Pending. */}}
+{{ $filterStatus := "Pending" }}
+{{ with .Params.patent_number }}{{ if hasPrefix (upper .) "US" }}{{ $filterStatus = "Granted" }}{{ else }}{{ $filterStatus = "Filed" }}{{ end }}{{ end }}
+{{ with .Params.status }}{{ $filterStatus = . | title }}{{ end }}
+
+<article class="publication" data-status="{{ $filterStatus }}">
+    <div class="publication__content">
+        <h3 class="publication__title">
+            {{ if .Params.link }}<a href="{{ .Params.link }}" target="_blank" rel="noopener">{{ .Title }}</a>{{ else }}{{ .Title }}{{ end }}
+        </h3>
+        <div class="publication__meta">
+            {{ with .Params.authors }}
+            <span class="publication__authors">{{ partial "author-list.html" (dict "authors" .) }}</span>
+            {{ end }}
+            {{ with .Params.patent_number }}
+            <span class="publication__venue">{{ . }}</span>
+            {{ end }}
+            <button type="button" class="patents-filter__chip patent-status-chip" data-status-chip="{{ $filterStatus }}" title="Show all {{ lower $filterStatus }} patents">{{ $filterStatus }}</button>
+        </div>
+    </div>
+    <div class="publication__links">
+        {{ with .Params.link }}
+        <a
+            href="{{ . }}"
+            class="publication__link"
+            title="View patent"
+            target="_blank"
+            rel="noopener"
+        >
+            {{ partial "icons/icons.html" "external-link" }}
+            <span class="visually-hidden">View patent</span>
+        </a>
+        {{ end }}
+    </div>
+</article>

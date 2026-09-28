@@ -26,6 +26,12 @@ paper_count:
 no_papers: "Nenhum artigo disponível"
 no_tags: "Nenhuma tag encontrada."
 
+# Publication Keywords (separate from blog Tags - see hugo.yaml taxonomies)
+publication_count:
+    one: "1 publicação"
+    other: "{{ .Count }} publicações"
+no_publications: "Nenhuma publicação encontrada."
+
 # Publication Item
 view_paper: "Ver"
 download_pdf: "Baixar PDF"

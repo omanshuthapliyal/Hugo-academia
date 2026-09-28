@@ -1,0 +1,8 @@
+{{/* Returns the broad-topic slug for a single tag (the context), or the
+     tag itself if no topic in data/topics.yaml lists it. */}}
+{{ $tag := . }}
+{{ $slug := $tag }}
+{{ range site.Data.topics | default slice }}
+  {{ if in .tags $tag }}{{ $slug = .slug }}{{ end }}
+{{ end }}
+{{ return $slug }}

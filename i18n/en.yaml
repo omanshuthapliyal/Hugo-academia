@@ -26,6 +26,12 @@ paper_count:
 no_papers: "No papers available"
 no_tags: "No tags found."
 
+# Publication Keywords (separate from blog Tags - see hugo.yaml taxonomies)
+publication_count:
+    one: "1 publication"
+    other: "{{ .Count }} publications"
+no_publications: "No publications found."
+
 # Publication Item
 view_paper: "View"
 download_pdf: "Download PDF"

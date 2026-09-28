@@ -1,3 +1,30 @@
+# Academia (research-first fork)
+
+> **About this fork.** This is [Omanshu Thapliyal](https://omanshuthapliyal.github.io)'s fork of
+> [**Academia**](https://github.com/joaocarlos/hugo-academia) by
+> [João Carlos N. Bittencourt](https://joaocarlos.github.io/), released under the MIT license
+> (see [LICENSE](LICENSE)). All credit for the original design goes to the upstream project.
+>
+> It reworks the theme into a **research-first portfolio**, where projects lead and writing stays strong:
+>
+> - **Project case-study pages** (`layouts/projects/single.html`): status, period and organization;
+>   link buttons for the project's own outputs; hero image/GIF/video with a reduced-motion still;
+>   auto-numbered sections with an "On this page" sidebar; project facts (organization, period,
+>   stack, topics); related papers/patents/posts; external resources; previous/next navigation.
+>   A matching archetype: `hugo new projects/<name>.md`.
+> - **Projects list** with compact thumbnail cards and filters by status, **broad topic** and
+>   **tech stack**. Topics come from a site-level `data/topics.yaml` that groups fine-grained tags;
+>   filters combine and are mirrored in the URL.
+> - **Patents** section (filed / pending / granted status derived from the application number),
+>   **keyword chips** on publications that act as filters, author lists, and per-paper links
+>   (paper, PDF, code, slides, poster, video).
+> - A second accent colour, typography and spacing tweaks, and a few new icons.
+>
+> The original README follows. To use this fork, replace `jcnbittencourt/hugo-academia` in the
+> install commands below with `omanshuthapliyal/Hugo-academia`.
+
+---
+
 # Academia - Hugo Theme for Academic Websites
 
 A modern, minimalist Hugo theme designed for academic professionals, researchers, and professors. Features beautiful serif typography, responsive design, dark mode support, multilingual capabilities, and comprehensive content types for academic portfolios.

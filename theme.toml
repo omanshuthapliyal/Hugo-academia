@@ -5,7 +5,7 @@ name = "Academia"
 license = "MIT"
 licenselink = "https://github.com/joaocarlos/hugo-academia/blob/main/LICENSE"
 description = "A modern, minimalist Hugo theme for academic websites"
-homepage = "https://github.com/joaocarlos/hugo-academia"
+homepage = "https://github.com/omanshuthapliyal/Hugo-academia"
 demosite = "https://joaocarlos.github.io/hugo-academia/"
 tags = [
   "academic",
@@ -35,5 +35,12 @@ features = [
 min_version = "0.112.0"
 
 [author]
-  name = "João Carlos N. Bittencourt"
+  name = "Omanshu Thapliyal"
+  homepage = "https://omanshuthapliyal.github.io/"
+
+# This is a fork; credit to the original theme.
+[original]
+  author = "João Carlos N. Bittencourt"
   homepage = "https://joaocarlos.github.io/"
+  name = "Academia"
+  repo = "https://github.com/joaocarlos/hugo-academia"

@@ -15,7 +15,8 @@
                 {{ i18n "powered_by" | default "Powered by" }}
                 <a href="https://gohugo.io/" target="_blank" rel="noopener noreferrer">Hugo</a>
                 &amp;
-                <a href="https://github.com/jcnbittencourt/hugo-academia" target="_blank" rel="noopener noreferrer">Academia</a>
+                {{/* footer.themeURL in hugo.yaml overrides this (e.g. to point at a fork) */}}
+                <a href="{{ .Site.Params.footer.themeURL | default "https://github.com/joaocarlos/hugo-academia" }}" target="_blank" rel="noopener noreferrer">Academia</a>
             </span>
             {{ end }}
         </div>

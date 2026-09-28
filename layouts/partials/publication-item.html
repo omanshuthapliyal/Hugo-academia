@@ -1,89 +1,47 @@
 {{/* Publication item partial - Compact inline layout with icon-only buttons
 */}}
-<article class="publication">
+{{/* The title itself should take readers straight to the actual paper
+     (DOI first, since that's the canonical/stable identifier; falling
+     back to whatever external link is on file otherwise) rather than to
+     this site's own per-paper page, which has no abstract or body copy
+     of its own and was otherwise a dead end. Only falls back to the
+     internal .Permalink on the rare entry with neither field set. */}}
+{{ $paperLink := "" }}
+{{ with .Params.doi }}{{ $paperLink = printf "https://doi.org/%s" . }}{{ end }}
+{{ if not $paperLink }}{{ with .Params.pdf }}{{ $paperLink = . }}{{ end }}{{ end }}
+<article class="publication" data-keywords="{{ delimit (.Params.keywords | default slice) "," }}">
     <div class="publication__content">
         <h3 class="publication__title">
+            {{ if $paperLink }}
+            <a href="{{ $paperLink }}" target="_blank" rel="noopener">{{ .Title }}</a>
+            {{ else }}
             <a href="{{ .Permalink }}">{{ .Title }}</a>
+            {{ end }}
         </h3>
         <div class="publication__meta">
             {{ with .Params.authors }}
-            <span class="publication__authors">{{ delimit . ", " }}</span>
+            <span class="publication__authors">{{ partial "author-list.html" (dict "authors" .) }}</span>
             {{ end }} {{ with .Params.venue }}
             <span class="publication__venue">{{ . }}</span>
             {{ end }}
         </div>
-    </div>
-    <div class="publication__links">
-        {{ with .Params.doi }}
-        <a
-            href="https://doi.org/{{ . }}"
-            class="publication__link"
-            title="DOI"
-            target="_blank"
-            rel="noopener"
-        >
-            {{ partial "icons/icons.html" "external-link" }}
-            <span class="visually-hidden">DOI</span>
-        </a>
-        {{ end }} {{ with .Params.pdf }}
-        <a
-            href="{{ . }}"
-            class="publication__link"
-            title="PDF"
-            target="_blank"
-            rel="noopener"
-        >
-            {{ partial "icons/icons.html" "download" }}
-            <span class="visually-hidden">PDF</span>
-        </a>
-        {{ end }} {{ with .Params.code }}
-        <a
-            href="{{ . }}"
-            class="publication__link"
-            title="Code"
-            target="_blank"
-            rel="noopener"
-        >
-            {{ partial "icons/icons.html" "github" }}
-            <span class="visually-hidden">Code</span>
-        </a>
-        {{ end }} {{ with .Params.slides }}
-        <a
-            href="{{ . }}"
-            class="publication__link"
-            title="Slides"
-            target="_blank"
-            rel="noopener"
-        >
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-            >
-                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                <line x1="8" y1="21" x2="16" y2="21"></line>
-                <line x1="12" y1="17" x2="12" y2="21"></line>
-            </svg>
-            <span class="visually-hidden">Slides</span>
-        </a>
-        {{ end }} {{ with .Params.video }}
-        <a
-            href="{{ . }}"
-            class="publication__link"
-            title="Video"
-            target="_blank"
-            rel="noopener"
-        >
-            {{ partial "icons/icons.html" "youtube" }}
-            <span class="visually-hidden">Video</span>
-        </a>
+        {{/* Labels: publication type (from existing type: conference/journal/preprint
+             data), any topic tags, and research keywords (separate taxonomy -
+             see hugo.yaml - so it doesn't mix with the blog's own tag
+             vocabulary), once populated */}}
+        {{ if or .Params.type .Params.tags .Params.keywords }}
+        <div class="publication__tags">
+            {{ with .Params.type }}
+            <span class="tag tag--type">{{ . | title }}</span>
+            {{ end }}
+            {{ range .Params.tags }}
+            <span class="tag">{{ . }}</span>
+            {{ end }}
+            {{ range .Params.keywords }}
+            <a href="{{ "keywords/" | relURL }}{{ . | urlize }}" class="tag tag--keyword" data-keyword="{{ . }}">{{ . }}</a>
+            {{ end }}
+        </div>
         {{ end }}
     </div>
+    {{ partial "content-links.html" . }}
 </article>

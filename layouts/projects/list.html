@@ -1,6 +1,52 @@
 {{ define "main" }}
 
-<div class="container container--wide">
+{{ $active := where .Pages ".Params.status" "active" }}
+{{ $completed := where .Pages ".Params.status" "completed" }}
+
+{{/* Sort active projects by start_date descending (newest first) */}}
+{{ $activeSorted := sort $active ".Params.start_date" "desc" }}
+
+{{/* Sort completed projects by end_date descending (most recently completed first) */}}
+{{ $completedSorted := sort $completed ".Params.end_date" "desc" }}
+
+{{/* Topic filter = BROAD topics from data/topics.yaml (each groups several
+     fine-grained project tags), in that file's order, listing only topics
+     at least one project actually uses. Any tag that no topic lists gets its
+     own chip after them, so nothing silently disappears. */}}
+{{ $usedTopics := slice }}
+{{ range .Pages }}
+  {{ range partial "project-topics.html" . }}
+    {{ if not (in $usedTopics .) }}{{ $usedTopics = $usedTopics | append . }}{{ end }}
+  {{ end }}
+{{ end }}
+{{ $topicChips := slice }}
+{{ $known := slice }}
+{{ range site.Data.topics | default slice }}
+  {{ $known = $known | append .slug }}
+  {{ if in $usedTopics .slug }}{{ $topicChips = $topicChips | append (dict "slug" .slug "name" .name) }}{{ end }}
+{{ end }}
+{{ range sort $usedTopics }}
+  {{ if not (in $known .) }}{{ $topicChips = $topicChips | append (dict "slug" . "name" .) }}{{ end }}
+{{ end }}
+
+{{/* Same for `stack` (tools/frameworks) - its own filter group, shown
+     only once at least one project lists a stack. */}}
+{{ $allStack := slice }}
+{{ range .Pages }}
+  {{ range .Params.stack }}
+    {{ if not (in $allStack .) }}
+      {{ $allStack = $allStack | append . }}
+    {{ end }}
+  {{ end }}
+{{ end }}
+{{ $allStack = sort $allStack }}
+
+{{/* Same 2-column .layout-with-toc grid as Publications/Patents/Blog, so
+     the content column sits flush-left. The right column holds a
+     status (Active/Completed) filter - real data exists for that today -
+     plus a tag filter that's ready as soon as tags are populated. */}}
+<div class="layout-with-toc">
+    <div class="projects-content">
     <header class="section-header">
         <h1 class="section-header__title">{{ .Title }}</h1>
         {{ with .Description }}
@@ -10,17 +56,8 @@
         {{ end }}
     </header>
 
-    {{ $active := where .Pages ".Params.status" "active" }}
-    {{ $completed := where .Pages ".Params.status" "completed" }}
-    
-    {{/* Sort active projects by start_date descending (newest first) */}}
-    {{ $activeSorted := sort $active ".Params.start_date" "desc" }}
-    
-    {{/* Sort completed projects by end_date descending (most recently completed first) */}}
-    {{ $completedSorted := sort $completed ".Params.end_date" "desc" }}
-    
     {{ if $activeSorted }}
-    <section class="projects-section">
+    <section class="projects-section" id="projects-section-active" data-status-section="active">
         <h2 class="projects-section__title">
             {{ i18n "active_projects" | default "Active Projects" }}
         </h2>
@@ -29,7 +66,7 @@
         </div>
     </section>
     {{ end }} {{ if $completedSorted }}
-    <section class="projects-section">
+    <section class="projects-section" id="projects-section-completed" data-status-section="completed">
         <h2 class="projects-section__title">
             {{ i18n "completed_projects" | default "Completed Projects" }}
         </h2>
@@ -42,9 +79,46 @@
         {{ i18n "no_projects" | default "No projects available." }}
     </p>
     {{ end }}
+    <p class="projects-filter__count" id="projects-filter-count" hidden></p>
+    <p class="list__empty" id="projects-filter-empty" hidden>No projects match this filter.</p>
+    </div>
+
+    {{ if or $activeSorted $completedSorted }}
+    <aside class="projects-sidebar" aria-label="Filter projects">
+        <div class="projects-filter" id="projects-filter">
+            <button type="button" class="projects-filter__clear" id="projects-filter-clear" hidden>&#x2715;&nbsp; Clear filters</button>
+            <p class="projects-filter__label">Filter by status</p>
+            <div class="projects-filter__status" role="group" aria-label="Status">
+                <button type="button" class="projects-filter__chip is-active" data-status-filter="all">All</button>
+                {{ if $activeSorted }}<button type="button" class="projects-filter__chip" data-status-filter="active">Active</button>{{ end }}
+                {{ if $completedSorted }}<button type="button" class="projects-filter__chip" data-status-filter="completed">Completed</button>{{ end }}
+            </div>
+            {{ if $topicChips }}
+            <p class="projects-filter__label projects-filter__label--tags">Filter by topic</p>
+            <div class="projects-filter__tags">
+                {{ range $topicChips }}
+                <button type="button" class="projects-filter__chip" data-tag-filter="{{ .slug }}">{{ .name }}</button>
+                {{ end }}
+            </div>
+            {{ end }}
+            {{ if $allStack }}
+            <p class="projects-filter__label projects-filter__label--tags">Filter by stack</p>
+            <div class="projects-filter__tags">
+                {{ range $allStack }}
+                <button type="button" class="projects-filter__chip projects-filter__chip--stack" data-stack-filter="{{ . }}">{{ . }}</button>
+                {{ end }}
+            </div>
+            {{ end }}
+        </div>
+    </aside>
+    {{ end }}
 </div>
 
 <style>
+    .projects-content {
+        max-width: var(--max-width-content);
+    }
+
     .projects-section {
         margin-bottom: var(--sp-10);
     }
@@ -61,7 +135,7 @@
     .projects-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-        gap: var(--sp-5);
+        gap: var(--sp-3);
     }
 
     @media (max-width: 440px) {
@@ -69,6 +143,231 @@
             grid-template-columns: 1fr;
         }
     }
+
+    .projects-filter__count {
+        font-size: var(--fs-sm);
+        color: var(--color-text-muted);
+        margin-top: calc(-1 * var(--sp-6));
+        margin-bottom: var(--sp-6);
+    }
+
+    /* Sidebar - same sticky treatment as Blog's browse sidebar, but never
+       hidden on narrow screens (functional filter UI, not a jump-nav
+       convenience), so it just stacks below the project list instead. */
+    .projects-sidebar {
+        position: sticky;
+        top: calc(var(--header-height) + var(--sp-8));
+        max-height: calc(100vh - var(--header-height) - var(--sp-16));
+        overflow-y: auto;
+    }
+
+    @media (max-width: 1099px) {
+        .projects-sidebar {
+            position: static;
+            max-height: none;
+        }
+    }
+
+    .projects-filter__label {
+        font-size: var(--fs-xs);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--color-text-muted);
+        margin-bottom: var(--sp-3);
+    }
+
+    .projects-filter__label--tags {
+        margin-top: var(--sp-6);
+    }
+
+    .projects-filter__status,
+    .projects-filter__tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--sp-2);
+    }
+
+    .projects-filter__chip {
+        font-family: var(--font-sans);
+        font-size: var(--fs-xs);
+        padding: var(--sp-1) var(--sp-3);
+        color: var(--color-text-secondary);
+        background: var(--color-bg-alt);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-full, 999px);
+        cursor: pointer;
+        transition: all var(--duration-fast) var(--ease-out);
+    }
+
+    .projects-filter__chip:hover {
+        border-color: var(--color-accent);
+        color: var(--color-accent);
+    }
+
+    .projects-filter__chip.is-active {
+        background: var(--color-accent);
+        color: white;
+        border-color: var(--color-accent);
+    }
+
+    /* Stack chips: second accent (slate-teal) so the two filter groups
+       read as different kinds of thing at a glance, before and after
+       selection. Topic chips keep the site's main accent. */
+    .projects-filter__chip--stack {
+        color: var(--color-accent-2);
+        background: var(--color-accent-2-light);
+        border-color: var(--color-accent-2-border);
+    }
+
+    .projects-filter__chip--stack:hover {
+        color: var(--color-accent-2);
+        border-color: var(--color-accent-2);
+    }
+
+    .projects-filter__chip--stack.is-active {
+        background: var(--color-accent-2);
+        color: var(--color-accent-2-contrast);
+        border-color: var(--color-accent-2);
+    }
+
+    .projects-filter__clear {
+        margin-bottom: var(--sp-5);
+        font-family: var(--font-sans);
+        font-size: var(--fs-xs);
+        padding: var(--sp-1) var(--sp-3);
+        color: var(--color-text-muted);
+        background: transparent;
+        border: 1px dashed var(--color-border-strong);
+        border-radius: var(--radius-full, 999px);
+        cursor: pointer;
+    }
+
+    .projects-filter__clear:hover {
+        color: var(--color-accent);
+        border-color: var(--color-accent);
+    }
+    .projects-filter__clear[hidden] { display: none; }
 </style>
+
+{{ if or $activeSorted $completedSorted }}
+<script>
+/* Status, topic and stack filters combine (AND): e.g. Active + Learning-Based
+   Control + PyTorch. Topics are the broad groups from data/topics.yaml. One
+   topic and one stack at a time; click a chip again to clear it. The state is
+   mirrored in the URL (?status=&topic=&stack=; ?tag=<fine tag> also works and
+   maps to its topic), so chips on
+   a project page can link straight into a filtered list, and a filtered
+   view can be shared. */
+(function () {
+  var filterBar = document.getElementById('projects-filter');
+  if (!filterBar) return;
+
+  var statusBtns = Array.prototype.slice.call(filterBar.querySelectorAll('[data-status-filter]'));
+  var tagBtns = Array.prototype.slice.call(filterBar.querySelectorAll('[data-tag-filter]'));
+  var stackBtns = Array.prototype.slice.call(filterBar.querySelectorAll('[data-stack-filter]'));
+  var clearBtn = document.getElementById('projects-filter-clear');
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.project-card'));
+  var sections = Array.prototype.slice.call(document.querySelectorAll('.projects-section'));
+  var countEl = document.getElementById('projects-filter-count');
+  var emptyEl = document.getElementById('projects-filter-empty');
+  // fine-grained tag -> broad topic slug, so old ?tag=<tag> links still land
+  var tagToTopic = {{ $m := dict }}{{ range site.Data.topics | default slice }}{{ $s := .slug }}{{ range .tags }}{{ $m = merge $m (dict . $s) }}{{ end }}{{ end }}{{ $m | jsonify | safeJS }};
+
+  function list(card, attr) {
+    return (card.getAttribute(attr) || '').split(',').filter(Boolean);
+  }
+  function has(btns, attr, v) {
+    return btns.some(function (b) { return b.getAttribute(attr) === v; });
+  }
+
+  var params = new URLSearchParams(window.location.search);
+  var state = { status: 'all', tag: null, stack: null };
+  if (has(statusBtns, 'data-status-filter', params.get('status'))) state.status = params.get('status');
+  var tagParam = params.get('topic') || params.get('tag');
+  if (tagParam && tagToTopic[tagParam]) tagParam = tagToTopic[tagParam];
+  if (has(tagBtns, 'data-tag-filter', tagParam)) state.tag = tagParam;
+  if (has(stackBtns, 'data-stack-filter', params.get('stack'))) state.stack = params.get('stack');
+
+  function syncUrl() {
+    var p = new URLSearchParams();
+    if (state.status !== 'all') p.set('status', state.status);
+    if (state.tag) p.set('topic', state.tag);
+    if (state.stack) p.set('stack', state.stack);
+    var q = p.toString();
+    try { history.replaceState(null, '', window.location.pathname + (q ? '?' + q : '')); } catch (e) {}
+  }
+
+  function render() {
+    var visibleCount = 0;
+
+    cards.forEach(function (card) {
+      var statusOk = state.status === 'all' || card.getAttribute('data-status') === state.status;
+      var tagOk = !state.tag || list(card, 'data-topics').indexOf(state.tag) !== -1;
+      var stackOk = !state.stack || list(card, 'data-stack').indexOf(state.stack) !== -1;
+      var visible = statusOk && tagOk && stackOk;
+      card.hidden = !visible;
+      if (visible) visibleCount++;
+    });
+
+    // Hide a whole section's header if none of its cards survived the filter.
+    sections.forEach(function (section) {
+      var visibleInSection = Array.prototype.some.call(
+        section.querySelectorAll('.project-card'),
+        function (c) { return !c.hidden; }
+      );
+      section.hidden = !visibleInSection;
+    });
+
+    statusBtns.forEach(function (b) { b.classList.toggle('is-active', b.getAttribute('data-status-filter') === state.status); });
+    tagBtns.forEach(function (b) { b.classList.toggle('is-active', b.getAttribute('data-tag-filter') === state.tag); });
+    stackBtns.forEach(function (b) { b.classList.toggle('is-active', b.getAttribute('data-stack-filter') === state.stack); });
+
+    var active = state.status !== 'all' || !!state.tag || !!state.stack;
+    if (clearBtn) clearBtn.hidden = !active;
+    if (countEl) {
+      countEl.hidden = !active;
+      countEl.textContent = active ? (visibleCount + ' of ' + cards.length + ' project' + (cards.length === 1 ? '' : 's')) : '';
+    }
+    if (emptyEl) {
+      emptyEl.hidden = visibleCount > 0;
+    }
+    syncUrl();
+  }
+
+  statusBtns.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      state.status = btn.getAttribute('data-status-filter');
+      render();
+    });
+  });
+
+  tagBtns.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var tag = btn.getAttribute('data-tag-filter');
+      state.tag = state.tag === tag ? null : tag;
+      render();
+    });
+  });
+
+  stackBtns.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var s = btn.getAttribute('data-stack-filter');
+      state.stack = state.stack === s ? null : s;
+      render();
+    });
+  });
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', function () {
+      state = { status: 'all', tag: null, stack: null };
+      render();
+    });
+  }
+
+  render();
+})();
+</script>
+{{ end }}
 
 {{ end }}

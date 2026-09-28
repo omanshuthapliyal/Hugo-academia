@@ -65,6 +65,67 @@ $profileDept := $langProfile.department | default $globalProfile.department }}
     {{ end }}
 </section>
 
+{{/* --- Research-first homepage highlights ------------------------------
+     The homepage used to be nothing but the static bio card above - no
+     sign of ongoing work at all before a visitor clicks into a section.
+     These two teasers surface real, already-existing content (nothing
+     fabricated: same front matter Projects/Publications already use) so
+     "currently working on" and "recently published" are visible without
+     a click. Both are omitted entirely if there's nothing real to show. */}}
+
+{{/* params.homepage.showHighlights - off while project pages get their own
+     dedicated redesign (see hugo.yaml). Both sections stay fully built
+     underneath, so this is a one-line flip back to true, not a rebuild. */}}
+{{ $showHighlights := .Site.Params.homepage.showHighlights | default false }}
+
+{{ $projectsSection := .Site.GetPage "section" "projects" }}
+{{ $recentActiveProjects := slice }}
+{{ if $showHighlights }}
+{{ with $projectsSection }}
+  {{ $activeProjects := where .Pages ".Params.status" "active" }}
+  {{ $recentActiveProjects = first 3 (sort $activeProjects ".Params.start_date" "desc") }}
+{{ end }}
+{{ end }}
+
+{{/* Papers live on the default-language site and are shared across
+     languages - same cross-language lookup papers/list.html already uses. */}}
+{{ $defaultLang := site.Sites.Default }}
+{{ $papersSection := $defaultLang.GetPage "section" "papers" }}
+{{ $recentPapers := slice }}
+{{ if $showHighlights }}
+{{ with $papersSection }}
+  {{ $recentPapers = first 3 .Pages.ByDate.Reverse }}
+{{ end }}
+{{ end }}
+
+{{ if $recentActiveProjects }}
+<section class="homepage-highlights">
+    <div class="container container--wide">
+        <div class="homepage-highlights__header">
+            <h2 class="homepage-highlights__title">{{ i18n "currently_working_on" | default "Currently working on" }}</h2>
+            <a href="{{ "projects" | relURL }}" class="homepage-highlights__link">{{ i18n "all_projects" | default "All projects" }} &rarr;</a>
+        </div>
+        <div class="homepage-highlights__grid">
+            {{ range $recentActiveProjects }} {{ partial "project-card.html" . }} {{ end }}
+        </div>
+    </div>
+</section>
+{{ end }}
+
+{{ if $recentPapers }}
+<section class="homepage-highlights homepage-highlights--publications">
+    <div class="container container--wide">
+        <div class="homepage-highlights__header">
+            <h2 class="homepage-highlights__title">{{ i18n "recent_publications" | default "Recent publications" }}</h2>
+            <a href="{{ "papers" | relURL }}" class="homepage-highlights__link">{{ i18n "all_publications" | default "All publications" }} &rarr;</a>
+        </div>
+        <div class="homepage-highlights__grid homepage-highlights__grid--list">
+            {{ range $recentPapers }} {{ partial "publication-item.html" . }} {{ end }}
+        </div>
+    </div>
+</section>
+{{ end }}
+
 <style>
     .profile__social {
         display: flex;
@@ -77,6 +138,85 @@ $profileDept := $langProfile.department | default $globalProfile.department }}
     .profile__social .social-icon {
         width: 44px;
         height: 44px;
+    }
+
+    /* -------------------------------------------------------------------
+       Homepage highlights (Currently working on / Recent publications)
+       ------------------------------------------------------------------- */
+    .homepage-highlights {
+        padding: var(--sp-12) 0;
+        border-top: 1px solid var(--color-border-subtle);
+    }
+
+    .homepage-highlights--publications {
+        padding-top: 0;
+    }
+
+    .homepage-highlights__header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: var(--sp-4);
+        margin-bottom: var(--sp-6);
+        padding-bottom: var(--sp-4);
+        border-bottom: 1px solid var(--color-border-subtle);
+    }
+
+    .homepage-highlights__title {
+        font-family: var(--font-serif);
+        font-size: var(--fs-2xl);
+        font-weight: 600;
+    }
+
+    .homepage-highlights__link {
+        font-size: var(--fs-sm);
+        color: var(--color-text-muted);
+        white-space: nowrap;
+        transition: color var(--duration-fast) var(--ease-out);
+    }
+
+    .homepage-highlights__link:hover {
+        color: var(--color-accent);
+    }
+
+    /* Projects teaser: same responsive card grid as the Projects page
+       itself (kept separate/duplicated rather than shared, matching this
+       theme's existing pattern of page-scoped styles - see
+       .publication__title a repeated in papers/list.html and
+       patents/list.html). */
+    .homepage-highlights__grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: var(--sp-5);
+    }
+
+    /* Publications teaser: .publication already stacks as plain blocks via
+       main.css's base rule (no grid override needed here, unlike the
+       compact two-column layout Publications/Patents' own page styles
+       apply) - this wrapper just needs to not also try to grid them. */
+    .homepage-highlights__grid--list {
+        display: block;
+    }
+
+    /* Same title-link color fix Publications/Patents' own page styles each
+       apply (see patents/list.html's comment on this) - without it, a
+       publication title falls back to the browser's plain global link
+       color (= accent), which every other place these titles appear
+       deliberately avoids. */
+    .homepage-highlights__grid--list .publication__title a {
+        color: var(--color-text);
+        text-decoration: none;
+        transition: color var(--duration-fast) var(--ease-out);
+    }
+
+    .homepage-highlights__grid--list .publication__title a:hover {
+        color: var(--color-accent);
+    }
+
+    @media (max-width: 440px) {
+        .homepage-highlights__grid {
+            grid-template-columns: 1fr;
+        }
     }
 </style>
 

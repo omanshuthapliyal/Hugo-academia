@@ -1,7 +1,60 @@
 {{ define "main" }}
 {{/* Default list template for sections */}}
+{{ $isBlog := eq .Section "blog" }}
 
-<div class="container">
+{{/* $allTags/$postsData are declared here, outside the {{ if $isBlog }}
+     block below, because Go template `:=` scoping doesn't leak variables
+     out of an {{ if }} block - they need to exist (even as empty) at this
+     level so both the content column and the sidebar markup further down
+     can reference them regardless of which HTML container holds what. */}}
+{{ $allTags := slice }}
+{{ $postsData := slice }}
+{{ if $isBlog }}
+{{/* --- Search / tag / view-toggle browsing bar, backed by a full JSON
+     index of every post in this section so filtering isn't limited to
+     the current pagination page. --- */}}
+{{ $allPosts := .Pages.ByDate.Reverse }}
+{{ range $allPosts }}
+  {{ range .Params.tags }}
+    {{ if not (in $allTags .) }}
+      {{ $allTags = $allTags | append . }}
+    {{ end }}
+  {{ end }}
+{{ end }}
+{{ $allTags = sort $allTags }}
+
+{{/* Build the whole index as one native Go value and jsonify it ONCE,
+     then mark it safeJS. Hand-assembling JSON text with individual
+     {{ ... | jsonify }} interpolations inside a <script> block gets
+     double-encoded by Hugo/Go's contextual auto-escaper (it treats the
+     block as a JS string context and re-escapes the already-jsonified
+     output), so every field silently became a JSON-encoded STRING
+     instead of its real type - e.g. tags turned into the literal text
+     '["a","b"]' rather than an actual array, which is why .map()/.some()
+     on post.tags threw and broke search, tag filtering, and the Table
+     view (only the server-rendered default Cards list survived, since
+     it never touched this corrupted data). Building one Go slice and
+     jsonifying it once avoids the double-escaping entirely. */}}
+{{ range $allPosts }}
+  {{ $postsData = $postsData | append (dict
+      "title" .Title
+      "url" .RelPermalink
+      "date" (.Date.Format "Jan 2, 2006")
+      "excerpt" (.Description | default (.Content | plainify | truncate 200))
+      "tags" (.Params.tags | default (slice))
+      "readingTime" .ReadingTime
+  ) }}
+{{ end }}
+{{ end }}
+
+{{/* Same 2-column .layout-with-toc grid as Publications/Patents/Projects,
+     so the content column sits flush-left. On Blog, the search / tag /
+     view-toggle browsing bar moves into the right-hand column (like
+     Publications' Year sidebar) instead of sitting above the post list;
+     every other section using this template gets an empty right column,
+     same as Projects/Patents. */}}
+<div class="layout-with-toc">
+  <div class="list-content">
   <header class="section-header">
     <h1 class="section-header__title">{{ .Title }}</h1>
     {{ with .Description }}
@@ -13,10 +66,18 @@
       </div>
     {{ end }}
   </header>
-  
+
+  {{ if $isBlog }}
+  <script type="application/json" id="blog-search-index">{{ $postsData | jsonify | safeJS }}</script>
+
+  <div class="list" id="blog-search-results" hidden></div>
+  <nav class="pagination" id="blog-results-pagination" hidden aria-label="Filtered results pages"></nav>
+  {{ end }}
+
   {{ if .Pages }}
-    <div class="list">
-      {{ range .Pages.ByDate.Reverse }}
+    {{ $paginator := .Paginate (.Pages.ByDate.Reverse) }}
+    <div class="list" id="blog-default-list">
+      {{ range $paginator.Pages }}
         <article class="list__item">
           <header class="list__header">
             {{ if .Date }}
@@ -44,7 +105,7 @@
           {{ if .Params.tags }}
             <div class="list__tags">
               {{ range first 3 .Params.tags }}
-                <span class="tag">{{ . }}</span>
+                <button type="button" class="tag" data-tag="{{ . }}">{{ . }}</button>
               {{ end }}
             </div>
           {{ end }}
@@ -54,52 +115,88 @@
   {{ else }}
     <p class="list__empty">No items found in this section.</p>
   {{ end }}
-  
+
   {{/* Pagination */}}
-  {{ template "_internal/pagination.html" . }}
+  <div id="blog-default-pagination">
+    {{ template "_internal/pagination.html" . }}
+  </div>
+  </div>{{/* .list-content */}}
+
+  {{ if $isBlog }}
+  <aside class="blog-sidebar" aria-label="Filter and search posts">
+    <div class="blog-browse" id="blog-browse">
+      <div class="blog-browse__controls">
+        <div class="blog-browse__search">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input type="search" id="blog-search-input" placeholder="Search posts by title, tag, or excerpt&hellip;" aria-label="Search posts">
+        </div>
+        <div class="blog-browse__view-toggle" role="group" aria-label="View">
+          <button type="button" class="blog-browse__view-btn is-active" data-view="cards">Cards</button>
+          <button type="button" class="blog-browse__view-btn" data-view="table">Table</button>
+        </div>
+      </div>
+      {{ if $allTags }}
+      <div class="blog-browse__tags">
+        <p class="blog-browse__tags-label">Filter by tag</p>
+        <div class="blog-browse__tags-chips" role="group" aria-label="Tags">
+          {{ range $allTags }}
+            <button type="button" class="blog-browse__tag" data-tag="{{ . }}">{{ . }}</button>
+          {{ end }}
+          <button type="button" class="blog-browse__tag blog-browse__tag--clear" id="blog-browse-clear" hidden>Clear filters</button>
+        </div>
+      </div>
+      {{ end }}
+      <p class="blog-browse__count" id="blog-browse-count" hidden></p>
+    </div>
+  </aside>
+  {{ end }}
 </div>
 
 <style>
+  .list-content {
+    max-width: var(--max-width-content);
+  }
+
   .section-header {
     margin-bottom: var(--sp-10);
     padding-bottom: var(--sp-8);
     border-bottom: 1px solid var(--color-border-subtle);
   }
-  
+
   .section-header__title {
     margin-bottom: var(--sp-4);
   }
-  
+
   .section-header__description {
     font-size: var(--fs-lg);
     color: var(--color-text-secondary);
     max-width: 600px;
   }
-  
+
   .section-header__content {
     margin-top: var(--sp-6);
   }
-  
+
   .list__item {
     padding: var(--sp-6) 0;
     border-bottom: 1px solid var(--color-border-subtle);
   }
-  
+
   .list__item:last-child {
     border-bottom: none;
   }
-  
+
   .list__header {
     margin-bottom: var(--sp-3);
   }
-  
+
   .list__date {
     display: block;
     font-size: var(--fs-sm);
     color: var(--color-text-muted);
     margin-bottom: var(--sp-2);
   }
-  
+
   .list__title {
     font-family: var(--font-serif);
     font-size: var(--fs-xl);
@@ -107,35 +204,35 @@
     line-height: var(--lh-snug);
     margin: 0;
   }
-  
+
   .list__title a {
     color: var(--color-text);
     text-decoration: none;
   }
-  
+
   .list__title a:hover {
     color: var(--color-accent);
   }
-  
+
   .list__description {
     font-size: var(--fs-base);
     color: var(--color-text-secondary);
     line-height: var(--lh-relaxed);
     margin-bottom: var(--sp-3);
   }
-  
+
   .list__tags {
     display: flex;
     flex-wrap: wrap;
     gap: var(--sp-2);
   }
-  
+
   .list__empty {
     text-align: center;
     color: var(--color-text-muted);
     padding: var(--sp-12) 0;
   }
-  
+
   /* Pagination styles */
   .pagination {
     display: flex;
@@ -145,11 +242,24 @@
     padding-top: var(--sp-8);
     border-top: 1px solid var(--color-border-subtle);
   }
-  
+
+  {{/* The "phantom pager" bug: .pagination's own `display: flex` has the
+       same specificity as the browser's built-in `[hidden] { display:
+       none }` rule, and author CSS always wins that tie regardless of
+       source order - so toggling the `hidden` attribute on
+       #blog-results-pagination (a `.pagination` element) never actually
+       hid it, and its stale Prev/1/2/3/4/5/Next buttons from the last
+       Table-view render stayed visible (and inert, since render() was
+       bailing out early in the non-active/Cards state) after switching
+       back to Cards. A higher-specificity [hidden] override fixes it. */}}
+  .pagination[hidden] {
+    display: none;
+  }
+
   .pagination .page-item {
     list-style: none;
   }
-  
+
   .pagination .page-link {
     display: flex;
     align-items: center;
@@ -157,28 +267,438 @@
     min-width: 40px;
     height: 40px;
     padding: 0 var(--sp-3);
+    font-family: inherit;
     font-size: var(--fs-sm);
     color: var(--color-text-secondary);
     background: var(--color-bg-alt);
+    border: none;
     border-radius: var(--radius-md);
     text-decoration: none;
+    cursor: pointer;
     transition: all var(--duration-fast) var(--ease-out);
   }
-  
+
   .pagination .page-link:hover {
     background: var(--color-accent-light);
     color: var(--color-accent);
   }
-  
+
   .pagination .page-item.active .page-link {
     background: var(--color-accent);
     color: white;
   }
-  
+
   .pagination .page-item.disabled .page-link {
     opacity: 0.5;
     pointer-events: none;
   }
+
+  /* Blog sidebar: holds the browse bar in the right-hand column, sticky
+     like .toc on Publications/single-page layouts, but never hidden on
+     narrow viewports (unlike .toc) since search/filter is functional UI,
+     not just a jump-nav convenience - below 1100px the grid collapses to
+     one column and this simply stacks under the post list instead. */
+  .blog-sidebar {
+    position: sticky;
+    top: calc(var(--header-height) + var(--sp-8));
+    max-height: calc(100vh - var(--header-height) - var(--sp-16));
+    overflow-y: auto;
+  }
+
+  @media (max-width: 1099px) {
+    .blog-sidebar {
+      position: static;
+      max-height: none;
+    }
+  }
+
+  /* Blog browse bar: search / tags / view toggle */
+  .blog-browse {
+    margin-bottom: var(--sp-8);
+  }
+
+  .blog-sidebar .blog-browse {
+    margin-bottom: 0;
+  }
+
+  .blog-browse__controls {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-4);
+    flex-wrap: wrap;
+  }
+
+  /* In the narrower sidebar column, stack search above the view toggle
+     instead of side-by-side - .blog-browse__search's 280px flex-basis
+     doesn't fit in var(--toc-width) (260px). */
+  .blog-sidebar .blog-browse__controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .blog-sidebar .blog-browse__search {
+    flex: none;
+  }
+
+  .blog-sidebar .blog-browse__view-toggle {
+    align-self: stretch;
+  }
+
+  .blog-sidebar .blog-browse__view-btn {
+    flex: 1;
+    text-align: center;
+  }
+
+  .blog-browse__search {
+    position: relative;
+    flex: 1 1 280px;
+    display: flex;
+    align-items: center;
+  }
+
+  .blog-browse__search svg {
+    position: absolute;
+    left: var(--sp-3);
+    width: 16px;
+    height: 16px;
+    color: var(--color-text-muted);
+    pointer-events: none;
+  }
+
+  .blog-browse__search input {
+    width: 100%;
+    padding: var(--sp-3) var(--sp-3) var(--sp-3) calc(var(--sp-3) * 2 + 16px);
+    font-family: var(--font-sans);
+    font-size: var(--fs-sm);
+    color: var(--color-text);
+    background: var(--color-bg-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    transition: border-color var(--duration-fast) var(--ease-out);
+  }
+
+  .blog-browse__search input:focus {
+    outline: none;
+    border-color: var(--color-accent);
+  }
+
+  .blog-browse__view-toggle {
+    display: flex;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .blog-browse__view-btn {
+    padding: var(--sp-2) var(--sp-4);
+    font-family: var(--font-sans);
+    font-size: var(--fs-sm);
+    color: var(--color-text-secondary);
+    background: var(--color-bg-alt);
+    border: none;
+    cursor: pointer;
+    transition: all var(--duration-fast) var(--ease-out);
+  }
+
+  .blog-browse__view-btn + .blog-browse__view-btn {
+    border-left: 1px solid var(--color-border);
+  }
+
+  .blog-browse__view-btn.is-active {
+    background: var(--color-accent);
+    color: white;
+  }
+
+  .blog-browse__tags {
+    margin-top: var(--sp-4);
+  }
+
+  {{/* Same label treatment as Patents' "Filter by status" (patents-filter__label)
+       - small, bold, uppercase, on its own line above the chips - rather
+       than the smaller inline label this used to sit next to. */}}
+  .blog-browse__tags-label {
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-muted);
+    margin-bottom: var(--sp-3);
+  }
+
+  .blog-browse__tags-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+
+  .blog-browse__tag {
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    padding: var(--sp-1) var(--sp-3);
+    color: var(--color-text-secondary);
+    background: var(--color-bg-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-full, 999px);
+    cursor: pointer;
+    transition: all var(--duration-fast) var(--ease-out);
+  }
+
+  .blog-browse__tag:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+  }
+
+  .blog-browse__tag.is-active {
+    background: var(--color-accent);
+    color: white;
+    border-color: var(--color-accent);
+  }
+
+  .blog-browse__tag--clear {
+    color: var(--color-text-muted);
+    border-style: dashed;
+  }
+
+  .blog-browse__count {
+    margin-top: var(--sp-3);
+    font-size: var(--fs-sm);
+    color: var(--color-text-muted);
+  }
+
+  /* Table view */
+  .blog-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--fs-sm);
+  }
+
+  .blog-table th {
+    text-align: left;
+    padding: var(--sp-3);
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-muted);
+    border-bottom: 2px solid var(--color-border-subtle);
+  }
+
+  .blog-table td {
+    padding: var(--sp-3);
+    border-bottom: 1px solid var(--color-border-subtle);
+    vertical-align: top;
+  }
+
+  .blog-table tr:hover td {
+    background: var(--color-bg-alt);
+  }
+
+  .blog-table a {
+    font-family: var(--font-serif);
+    font-weight: 600;
+    color: var(--color-text);
+    text-decoration: none;
+  }
+
+  .blog-table a:hover {
+    color: var(--color-accent);
+  }
+
+  .blog-table .blog-table__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-1);
+  }
+
+  .blog-table .blog-table__date {
+    white-space: nowrap;
+    color: var(--color-text-muted);
+  }
 </style>
+
+{{ if $isBlog }}
+<script>
+(function () {
+  var indexEl = document.getElementById('blog-search-index');
+  if (!indexEl) return;
+  var posts = JSON.parse(indexEl.textContent || '[]');
+
+  var searchInput = document.getElementById('blog-search-input');
+  var clearBtn = document.getElementById('blog-browse-clear');
+  var viewButtons = Array.prototype.slice.call(document.querySelectorAll('.blog-browse__view-btn'));
+  var resultsEl = document.getElementById('blog-search-results');
+  var resultsPagerEl = document.getElementById('blog-results-pagination');
+  var defaultList = document.getElementById('blog-default-list');
+  var defaultPagination = document.getElementById('blog-default-pagination');
+  var browseBar = document.getElementById('blog-browse');
+  var countEl = document.getElementById('blog-browse-count');
+  var PAGE_SIZE = 6;
+
+  var state = { query: '', tag: null, view: 'cards', page: 1 };
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+    });
+  }
+
+  function matches(post) {
+    var q = state.query.trim().toLowerCase();
+    var qOk = !q ||
+      post.title.toLowerCase().indexOf(q) !== -1 ||
+      post.excerpt.toLowerCase().indexOf(q) !== -1 ||
+      post.tags.some(function (t) { return t.toLowerCase().indexOf(q) !== -1; });
+    var tagOk = !state.tag || post.tags.indexOf(state.tag) !== -1;
+    return qOk && tagOk;
+  }
+
+  function tagChip(t) {
+    return '<button type="button" class="tag" data-tag="' + escapeHtml(t) + '">' + escapeHtml(t) + '</button>';
+  }
+
+  function renderCards(list) {
+    return list.map(function (p) {
+      var tagsHtml = p.tags.length
+        ? '<div class="list__tags">' + p.tags.slice(0, 3).map(tagChip).join('') + '</div>'
+        : '';
+      return '' +
+        '<article class="list__item">' +
+        '  <header class="list__header">' +
+        '    <time class="list__date">' + escapeHtml(p.date) + (p.readingTime ? ' &middot; ' + p.readingTime + ' min read' : '') + '</time>' +
+        '    <h2 class="list__title"><a href="' + p.url + '">' + escapeHtml(p.title) + '</a></h2>' +
+        '  </header>' +
+        '  <p class="list__description">' + escapeHtml(p.excerpt) + '</p>' +
+        tagsHtml +
+        '</article>';
+    }).join('');
+  }
+
+  function renderTable(list) {
+    var rows = list.map(function (p) {
+      return '' +
+        '<tr>' +
+        '  <td><a href="' + p.url + '">' + escapeHtml(p.title) + '</a></td>' +
+        '  <td class="blog-table__date">' + escapeHtml(p.date) + '</td>' +
+        '  <td class="blog-table__date">' + (p.readingTime || '&ndash;') + ' min</td>' +
+        '  <td class="blog-table__tags">' + p.tags.map(tagChip).join('') + '</td>' +
+        '</tr>';
+    }).join('');
+    return '<table class="blog-table"><thead><tr><th>Title</th><th>Date</th><th>Reading time</th><th>Tags</th></tr></thead><tbody>' + rows + '</tbody></table>';
+  }
+
+  function renderPager(totalPages) {
+    if (totalPages <= 1) return '';
+    var page = state.page;
+    var html = '';
+    html += '<span class="page-item' + (page <= 1 ? ' disabled' : '') + '"><button type="button" class="page-link" data-page="' + (page - 1) + '"' + (page <= 1 ? ' disabled' : '') + '>&larr; Prev</button></span>';
+    for (var i = 1; i <= totalPages; i++) {
+      html += '<span class="page-item' + (i === page ? ' active' : '') + '"><button type="button" class="page-link" data-page="' + i + '">' + i + '</button></span>';
+    }
+    html += '<span class="page-item' + (page >= totalPages ? ' disabled' : '') + '"><button type="button" class="page-link" data-page="' + (page + 1) + '"' + (page >= totalPages ? ' disabled' : '') + '>Next &rarr;</button></span>';
+    return html;
+  }
+
+  function render() {
+    var active = state.query.trim() !== '' || !!state.tag || state.view === 'table';
+    clearBtn.hidden = !(state.query.trim() !== '' || state.tag);
+
+    if (!active) {
+      resultsEl.hidden = true;
+      resultsPagerEl.hidden = true;
+      countEl.hidden = true;
+      if (defaultList) defaultList.hidden = false;
+      if (defaultPagination) defaultPagination.style.display = '';
+      return;
+    }
+
+    if (defaultList) defaultList.hidden = true;
+    if (defaultPagination) defaultPagination.style.display = 'none';
+
+    var filtered = posts.filter(matches);
+    var totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    if (state.page > totalPages) state.page = totalPages;
+    if (state.page < 1) state.page = 1;
+    var pageItems = filtered.slice((state.page - 1) * PAGE_SIZE, state.page * PAGE_SIZE);
+
+    resultsEl.hidden = false;
+    resultsEl.innerHTML = pageItems.length
+      ? (state.view === 'table' ? renderTable(pageItems) : renderCards(pageItems))
+      : '<p class="list__empty">No posts match your search.</p>';
+
+    resultsPagerEl.innerHTML = renderPager(totalPages);
+    resultsPagerEl.hidden = totalPages <= 1;
+
+    countEl.hidden = false;
+    countEl.textContent = filtered.length + ' of ' + posts.length + ' post' + (posts.length === 1 ? '' : 's');
+  }
+
+  function syncBrowseBarTagButtons() {
+    Array.prototype.slice.call(document.querySelectorAll('.blog-browse__tag[data-tag]')).forEach(function (b) {
+      b.classList.toggle('is-active', b.getAttribute('data-tag') === state.tag);
+    });
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener('input', function (e) {
+      state.query = e.target.value;
+      state.page = 1;
+      render();
+    });
+  }
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', function () {
+      state.query = '';
+      state.tag = null;
+      state.page = 1;
+      if (searchInput) searchInput.value = '';
+      syncBrowseBarTagButtons();
+      render();
+    });
+  }
+
+  viewButtons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      state.view = btn.getAttribute('data-view');
+      state.page = 1;
+      viewButtons.forEach(function (b) { b.classList.toggle('is-active', b === btn); });
+      render();
+    });
+  });
+
+  {{/* Single delegated listener for every tag chip on the page: the ones
+       in the browse bar (present at load), the ones under each post's
+       title in the default server-rendered list (also present at load),
+       and the ones inside the JS-rendered card/table results (only exist
+       after a render() call, so a per-element addEventListener bound once
+       at startup would never reach them - delegation from document
+       handles all three uniformly). Also handles the pager's Prev/Next/
+       page-number buttons the same way. */}}
+  document.addEventListener('click', function (e) {
+    var tagBtn = e.target.closest('[data-tag]');
+    if (tagBtn) {
+      var tag = tagBtn.getAttribute('data-tag');
+      var fromBrowseBar = !!tagBtn.closest('#blog-browse');
+      state.tag = state.tag === tag ? null : tag;
+      state.page = 1;
+      syncBrowseBarTagButtons();
+      render();
+      if (!fromBrowseBar && browseBar) browseBar.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+
+    var pageBtn = e.target.closest('#blog-results-pagination [data-page]');
+    if (pageBtn && !pageBtn.disabled) {
+      state.page = parseInt(pageBtn.getAttribute('data-page'), 10) || 1;
+      render();
+      if (browseBar) browseBar.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+
+  render();
+})();
+</script>
+{{ end }}
 
 {{ end }}

@@ -370,6 +370,50 @@
 })();
 
 // ==========================================================================
+// Subtle Scroll Reveal
+// ==========================================================================
+// Fades + slides in project cards, publication/patent rows, and the
+// server-rendered blog list on load/scroll - kept in its own top-level IIFE
+// (rather than inside the main one above) so an early return here for
+// reduced-motion / no-IntersectionObserver support can't accidentally skip
+// the theme toggle, mobile menu, or any other unrelated logic above.
+// Deliberately scoped to page-load (SSR) content only, not the
+// client-rendered blog search/filter results in list.html's own script,
+// so it never fights with that script's own render() calls.
+(function () {
+  'use strict';
+
+  var prefersReducedMotion = !window.matchMedia('(prefers-reduced-motion: no-preference)').matches;
+  if (prefersReducedMotion || !('IntersectionObserver' in window)) return;
+
+  var groups = [
+    document.querySelectorAll('.projects-grid > .project-card'),
+    document.querySelectorAll('.publications-list > .publication'),
+    document.querySelectorAll('#blog-default-list > .list__item'),
+    document.querySelectorAll('.homepage-highlights__grid > *')
+  ];
+
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('is-revealed');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+  groups.forEach(function (list) {
+    Array.prototype.forEach.call(list, function (el, i) {
+      el.setAttribute('data-reveal', '');
+      // Small stagger so a row of cards cascades in rather than popping
+      // together, capped so a long list doesn't end in a long dead wait.
+      el.style.transitionDelay = (Math.min(i, 8) * 45) + 'ms';
+      observer.observe(el);
+    });
+  });
+})();
+
+// ==========================================================================
 // CSS for Code Copy Button (injected via JS)
 // ==========================================================================
 
