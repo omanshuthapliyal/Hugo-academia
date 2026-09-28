@@ -216,6 +216,14 @@
     padding: 0;
 }
 
+/* The `hidden` attribute must always win. The browser's own
+   `[hidden] { display: none }` loses to any author rule that sets display
+   (e.g. `.project-card--thumb { display: grid }`), so JS filters that set
+   el.hidden = true silently left those elements visible. */
+[hidden] {
+    display: none !important;
+}
+
 html {
     font-size: 16px;
     scroll-behavior: smooth;

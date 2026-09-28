@@ -618,7 +618,7 @@
   var countEl = document.getElementById('blog-browse-count');
   var PAGE_SIZE = 6;
 
-  var state = { query: '', tag: null, view: 'cards', page: 1, sortKey: 'date', sortDir: 'desc' };
+  var state = { query: '', tags: [], view: 'cards', page: 1, sortKey: 'date', sortDir: 'desc' };
 
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, function (c) {
@@ -632,7 +632,8 @@
       post.title.toLowerCase().indexOf(q) !== -1 ||
       post.excerpt.toLowerCase().indexOf(q) !== -1 ||
       post.tags.some(function (t) { return t.toLowerCase().indexOf(q) !== -1; });
-    var tagOk = !state.tag || post.tags.indexOf(state.tag) !== -1;
+    // Several selected tags: a post matching ANY of them shows.
+    var tagOk = !state.tags.length || state.tags.some(function (t) { return post.tags.indexOf(t) !== -1; });
     return qOk && tagOk;
   }
 
@@ -708,8 +709,8 @@
   }
 
   function render() {
-    var active = state.query.trim() !== '' || !!state.tag || state.view === 'table';
-    clearBtn.hidden = !(state.query.trim() !== '' || state.tag);
+    var active = state.query.trim() !== '' || state.tags.length > 0 || state.view === 'table';
+    clearBtn.hidden = !(state.query.trim() !== '' || state.tags.length > 0);
 
     if (!active) {
       resultsEl.hidden = true;
@@ -744,7 +745,9 @@
 
   function syncBrowseBarTagButtons() {
     Array.prototype.slice.call(document.querySelectorAll('.blog-browse__tag[data-tag]')).forEach(function (b) {
-      b.classList.toggle('is-active', b.getAttribute('data-tag') === state.tag);
+      var on = state.tags.indexOf(b.getAttribute('data-tag')) !== -1;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
   }
 
@@ -759,7 +762,7 @@
   if (clearBtn) {
     clearBtn.addEventListener('click', function () {
       state.query = '';
-      state.tag = null;
+      state.tags = [];
       state.page = 1;
       if (searchInput) searchInput.value = '';
       syncBrowseBarTagButtons();
@@ -789,7 +792,8 @@
     if (tagBtn) {
       var tag = tagBtn.getAttribute('data-tag');
       var fromBrowseBar = !!tagBtn.closest('#blog-browse');
-      state.tag = state.tag === tag ? null : tag;
+      var i = state.tags.indexOf(tag);
+      if (i === -1) state.tags.push(tag); else state.tags.splice(i, 1);
       state.page = 1;
       syncBrowseBarTagButtons();
       render();

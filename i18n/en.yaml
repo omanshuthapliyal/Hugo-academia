@@ -61,10 +61,10 @@ and: "and"
 social: "Social"
 
 # Projects
-active_projects: "Active Projects"
+active_projects: "Ongoing Projects"
 completed_projects: "Completed Projects"
 no_projects: "No projects available yet."
-status_active: "Active"
+status_active: "Ongoing"
 status_completed: "Completed"
 project: "Project"
 

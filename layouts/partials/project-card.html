@@ -24,7 +24,7 @@
       <span class="project-card__status project-card__status--{{ .Params.status | default "other" }}">
         {{ if eq .Params.status "active" }}
           <span class="status-dot status-dot--active"></span>
-          {{ i18n "status_active" | default "Active" }}
+          {{ i18n "status_active" | default "Ongoing" }}
         {{ else if eq .Params.status "completed" }}
           <span class="status-dot status-dot--completed"></span>
           {{ i18n "status_completed" | default "Completed" }}

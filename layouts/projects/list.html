@@ -59,7 +59,7 @@
     {{ if $activeSorted }}
     <section class="projects-section" id="projects-section-active" data-status-section="active">
         <h2 class="projects-section__title">
-            {{ i18n "active_projects" | default "Active Projects" }}
+            {{ i18n "active_projects" | default "Ongoing Projects" }}
         </h2>
         <div class="projects-grid">
             {{ range $activeSorted }} {{ partial "project-card.html" . }} {{ end }}
@@ -90,7 +90,7 @@
             <p class="projects-filter__label">Filter by status</p>
             <div class="projects-filter__status" role="group" aria-label="Status">
                 <button type="button" class="projects-filter__chip is-active" data-status-filter="all">All</button>
-                {{ if $activeSorted }}<button type="button" class="projects-filter__chip" data-status-filter="active">Active</button>{{ end }}
+                {{ if $activeSorted }}<button type="button" class="projects-filter__chip" data-status-filter="active">{{ i18n "status_active" | default "Ongoing" }}</button>{{ end }}
                 {{ if $completedSorted }}<button type="button" class="projects-filter__chip" data-status-filter="completed">Completed</button>{{ end }}
             </div>
             {{ if $topicChips }}
@@ -252,11 +252,13 @@
 
 {{ if or $activeSorted $completedSorted }}
 <script>
-/* Status, topic and stack filters combine (AND): e.g. Active + Learning-Based
-   Control + PyTorch. Topics are the broad groups from data/topics.yaml. One
-   topic and one stack at a time; click a chip again to clear it. The state is
-   mirrored in the URL (?status=&topic=&stack=; ?tag=<fine tag> also works and
-   maps to its topic), so chips on
+/* Filters: status is single-choice (All / Ongoing / Completed). Topic and
+   stack chips are multi-select: several chips in one group match ANY of them
+   (OR), and the groups combine with AND, e.g. Ongoing + (Safety OR Cybersecurity)
+   + (PyTorch OR JAX). Click a chip again to deselect it. Topics are the broad
+   groups from data/topics.yaml. The state is mirrored in the URL
+   (?status=&topic=a,b&stack=x,y; ?tag=<fine tag> also works and maps to its
+   topic), so chips on
    a project page can link straight into a filtered list, and a filtered
    view can be shared. */
 (function () {
@@ -282,19 +284,23 @@
   }
 
   var params = new URLSearchParams(window.location.search);
-  var state = { status: 'all', tag: null, stack: null };
+  var state = { status: 'all', tags: [], stacks: [] };
+  function csv(v) { return (v || '').split(',').filter(Boolean); }
+  function uniq(a) { return a.filter(function (x, i) { return a.indexOf(x) === i; }); }
+  function toggle(arr, v) { var i = arr.indexOf(v); if (i === -1) arr.push(v); else arr.splice(i, 1); }
+  function anyIn(have, want) { return want.some(function (w) { return have.indexOf(w) !== -1; }); }
   if (has(statusBtns, 'data-status-filter', params.get('status'))) state.status = params.get('status');
-  var tagParam = params.get('topic') || params.get('tag');
-  if (tagParam && tagToTopic[tagParam]) tagParam = tagToTopic[tagParam];
-  if (has(tagBtns, 'data-tag-filter', tagParam)) state.tag = tagParam;
-  if (has(stackBtns, 'data-stack-filter', params.get('stack'))) state.stack = params.get('stack');
+  state.tags = uniq(csv(params.get('topic')).concat(csv(params.get('tag'))).map(function (t) {
+    return tagToTopic[t] || t;
+  }).filter(function (t) { return has(tagBtns, 'data-tag-filter', t); }));
+  state.stacks = uniq(csv(params.get('stack')).filter(function (s) { return has(stackBtns, 'data-stack-filter', s); }));
 
   function syncUrl() {
     var p = new URLSearchParams();
     if (state.status !== 'all') p.set('status', state.status);
-    if (state.tag) p.set('topic', state.tag);
-    if (state.stack) p.set('stack', state.stack);
-    var q = p.toString();
+    if (state.tags.length) p.set('topic', state.tags.join(','));
+    if (state.stacks.length) p.set('stack', state.stacks.join(','));
+    var q = p.toString().replace(/%2C/g, ',');
     try { history.replaceState(null, '', window.location.pathname + (q ? '?' + q : '')); } catch (e) {}
   }
 
@@ -303,8 +309,8 @@
 
     cards.forEach(function (card) {
       var statusOk = state.status === 'all' || card.getAttribute('data-status') === state.status;
-      var tagOk = !state.tag || list(card, 'data-topics').indexOf(state.tag) !== -1;
-      var stackOk = !state.stack || list(card, 'data-stack').indexOf(state.stack) !== -1;
+      var tagOk = !state.tags.length || anyIn(list(card, 'data-topics'), state.tags);
+      var stackOk = !state.stacks.length || anyIn(list(card, 'data-stack'), state.stacks);
       var visible = statusOk && tagOk && stackOk;
       card.hidden = !visible;
       if (visible) visibleCount++;
@@ -320,10 +326,16 @@
     });
 
     statusBtns.forEach(function (b) { b.classList.toggle('is-active', b.getAttribute('data-status-filter') === state.status); });
-    tagBtns.forEach(function (b) { b.classList.toggle('is-active', b.getAttribute('data-tag-filter') === state.tag); });
-    stackBtns.forEach(function (b) { b.classList.toggle('is-active', b.getAttribute('data-stack-filter') === state.stack); });
+    tagBtns.forEach(function (b) {
+      var on = state.tags.indexOf(b.getAttribute('data-tag-filter')) !== -1;
+      b.classList.toggle('is-active', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    stackBtns.forEach(function (b) {
+      var on = state.stacks.indexOf(b.getAttribute('data-stack-filter')) !== -1;
+      b.classList.toggle('is-active', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
 
-    var active = state.status !== 'all' || !!state.tag || !!state.stack;
+    var active = state.status !== 'all' || state.tags.length > 0 || state.stacks.length > 0;
     if (clearBtn) clearBtn.hidden = !active;
     if (countEl) {
       countEl.hidden = !active;
@@ -344,23 +356,21 @@
 
   tagBtns.forEach(function (btn) {
     btn.addEventListener('click', function () {
-      var tag = btn.getAttribute('data-tag-filter');
-      state.tag = state.tag === tag ? null : tag;
+      toggle(state.tags, btn.getAttribute('data-tag-filter'));
       render();
     });
   });
 
   stackBtns.forEach(function (btn) {
     btn.addEventListener('click', function () {
-      var s = btn.getAttribute('data-stack-filter');
-      state.stack = state.stack === s ? null : s;
+      toggle(state.stacks, btn.getAttribute('data-stack-filter'));
       render();
     });
   });
 
   if (clearBtn) {
     clearBtn.addEventListener('click', function () {
-      state = { status: 'all', tag: null, stack: null };
+      state = { status: 'all', tags: [], stacks: [] };
       render();
     });
   }

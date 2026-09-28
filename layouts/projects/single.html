@@ -92,7 +92,7 @@
     <div class="project-head__meta">
       <span class="project-status project-status--{{ $p.status | default "other" }}">
         <span class="status-dot {{ if $isActive }}status-dot--active{{ else }}status-dot--completed{{ end }}"></span>
-        {{ if $isActive }}{{ i18n "status_active" | default "Active" }}{{ else if eq $p.status "completed" }}{{ i18n "status_completed" | default "Completed" }}{{ else }}{{ $p.status | default "Project" | title }}{{ end }}
+        {{ if $isActive }}{{ i18n "status_active" | default "Ongoing" }}{{ else if eq $p.status "completed" }}{{ i18n "status_completed" | default "Completed" }}{{ else }}{{ $p.status | default "Project" | title }}{{ end }}
       </span>
       {{ with $period }}<span class="project-head__sep" aria-hidden="true">·</span><span>{{ . }}</span>{{ end }}
       {{ with $p.organization }}<span class="project-head__sep" aria-hidden="true">·</span><span>{{ . }}</span>{{ end }}
@@ -141,7 +141,8 @@
         <h2 class="project-facts__title">Project facts</h2>
         <dl class="project-facts__list">
           {{ with $p.role }}<div><dt>Role</dt><dd>{{ . }}</dd></div>{{ end }}
-          {{ with $p.organization }}<div><dt>Organization</dt><dd>{{ . }}</dd></div>{{ end }}
+          {{/* "Lab, Org" -> "Lab," / "Org" on two lines (split at the first comma). */}}
+          {{ with $p.organization }}{{ $parts := split . ", " }}<div><dt>Organization</dt><dd>{{ index $parts 0 }}{{ with after 1 $parts }},<br>{{ delimit . ", " }}{{ end }}</dd></div>{{ end }}
           {{ with $period }}<div><dt>Period</dt><dd>{{ . }}</dd></div>{{ end }}
           {{ with $p.team }}<div><dt>Team</dt><dd>{{ delimit . ", " }}</dd></div>{{ end }}
           {{ with $p.stack }}

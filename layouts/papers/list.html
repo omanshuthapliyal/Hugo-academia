@@ -538,7 +538,8 @@ append $year }} {{ end }} {{ end }}
 
 {{ if $allKeywords }}
 <script>
-    // Keyword filter - single-select toggle + "Clear filters", same
+    // Keyword filter - multi-select (a paper matching ANY selected keyword
+    // shows; click a chip again to deselect) + "Clear filters", same
     // interaction as Blog's "Filter by tag" (_default/list.html). Hides
     // non-matching .publication items, then hides any Spotlight/Year/
     // Category section left with none of its own items visible - same
@@ -563,7 +564,7 @@ append $year }} {{ end }} {{ end }}
         )
         var spotlight = document.querySelector(".publications-spotlight")
 
-        var activeKeyword = null
+        var activeKeywords = []
 
         function anyVisible(container) {
             return Array.prototype.some.call(
@@ -579,7 +580,9 @@ append $year }} {{ end }} {{ end }}
                 var keywords = (item.getAttribute("data-keywords") || "")
                     .split(",")
                     .filter(Boolean)
-                var visible = !activeKeyword || keywords.indexOf(activeKeyword) !== -1
+                var visible = !activeKeywords.length || activeKeywords.some(function (k) {
+                    return keywords.indexOf(k) !== -1
+                })
                 item.hidden = !visible
             })
 
@@ -593,9 +596,14 @@ append $year }} {{ end }} {{ end }}
                 spotlight.hidden = !anyVisible(spotlight)
             }
 
-            if (clearBtn) clearBtn.hidden = !activeKeyword
+            if (clearBtn) clearBtn.hidden = !activeKeywords.length
+            chips.forEach(function (c) {
+                var on = activeKeywords.indexOf(c.getAttribute("data-keyword-filter")) !== -1
+                c.classList.toggle("is-active", on)
+                c.setAttribute("aria-pressed", on ? "true" : "false")
+            })
             itemChips.forEach(function (c) {
-                c.classList.toggle("is-active", c.getAttribute("data-keyword") === activeKeyword)
+                c.classList.toggle("is-active", activeKeywords.indexOf(c.getAttribute("data-keyword")) !== -1)
             })
         }
 
@@ -618,23 +626,16 @@ append $year }} {{ end }} {{ end }}
         chips.forEach(function (chip) {
             chip.addEventListener("click", function () {
                 var keyword = chip.getAttribute("data-keyword-filter")
-                activeKeyword = activeKeyword === keyword ? null : keyword
-                chips.forEach(function (c) {
-                    c.classList.toggle(
-                        "is-active",
-                        c.getAttribute("data-keyword-filter") === activeKeyword,
-                    )
-                })
+                var i = activeKeywords.indexOf(keyword)
+                if (i === -1) activeKeywords.push(keyword)
+                else activeKeywords.splice(i, 1)
                 render()
             })
         })
 
         if (clearBtn) {
             clearBtn.addEventListener("click", function () {
-                activeKeyword = null
-                chips.forEach(function (c) {
-                    c.classList.remove("is-active")
-                })
+                activeKeywords = []
                 render()
             })
         }
