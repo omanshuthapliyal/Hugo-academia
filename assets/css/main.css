@@ -1870,3 +1870,19 @@ button.tag {
         transition: none !important;
     }
 }
+
+/* -----------------------------------------------------------------------------
+   Accent touches (moved here from the retired palette-preview custom.css)
+   ----------------------------------------------------------------------------- */
+/* Top-level section headings (Projects, Publications, Patents, Blog, About)
+   take the accent color; content titles (posts, papers, projects) don't. */
+.section-header__title,
+.article__title--page {
+    color: var(--color-accent);
+}
+
+/* Paper type badge uses the second (slate-teal) accent. */
+.publication__tags .tag--type {
+    background: var(--color-accent-2-light, var(--color-accent-light));
+    color: var(--color-accent-2, var(--color-accent));
+}

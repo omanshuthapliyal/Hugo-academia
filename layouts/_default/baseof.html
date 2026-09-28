@@ -244,9 +244,8 @@
   {{ $js := resources.Get "js/main.js" | minify | fingerprint }}
   <script src="{{ $js.RelPermalink }}" integrity="{{ $js.Data.Integrity }}" defer></script>
 
-  {{/* Custom JS if exists - mirrors the custom.css hook above, so
-       preview-only additions (like the palette switcher) stay isolated
-       from the theme's own main.js and are trivial to remove later. */}}
+  {{/* Custom JS if exists (assets/js/custom.js) - optional site-level hook,
+       mirrors the custom.css hook above. */}}
   {{ if resources.Get "js/custom.js" }}
     {{ $customJS := resources.Get "js/custom.js" | minify | fingerprint }}
     <script src="{{ $customJS.RelPermalink }}" integrity="{{ $customJS.Data.Integrity }}" defer></script>
