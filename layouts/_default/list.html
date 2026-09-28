@@ -43,6 +43,7 @@
       "excerpt" (.Description | default (.Content | plainify | truncate 200))
       "tags" (.Params.tags | default (slice))
       "readingTime" .ReadingTime
+      "ts" .Date.Unix
   ) }}
 {{ end }}
 {{ end }}
@@ -551,10 +552,46 @@
     color: var(--color-accent);
   }
 
-  .blog-table .blog-table__tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--sp-1);
+  /* stays a normal table cell (display:flex on a <td> broke the row
+     borders); the chips wrap with their own spacing instead */
+  .blog-table .blog-table__tags .tag {
+    display: inline-block;
+    margin: 2px var(--sp-1) 2px 0;
+  }
+
+  .blog-table__sort {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    text-transform: inherit;
+    letter-spacing: inherit;
+    background: none;
+    border: none;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .blog-table__sort:hover,
+  .blog-table__sort.is-active {
+    color: var(--color-accent);
+  }
+
+  .blog-table__arrows {
+    display: inline-flex;
+    flex-direction: column;
+    font-size: 0.55rem;
+    line-height: 0.95;
+  }
+
+  .blog-table__arrow {
+    opacity: 0.35;
+  }
+
+  .blog-table__arrow.is-on {
+    opacity: 1;
   }
 
   .blog-table .blog-table__date {
@@ -581,7 +618,7 @@
   var countEl = document.getElementById('blog-browse-count');
   var PAGE_SIZE = 6;
 
-  var state = { query: '', tag: null, view: 'cards', page: 1 };
+  var state = { query: '', tag: null, view: 'cards', page: 1, sortKey: 'date', sortDir: 'desc' };
 
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, function (c) {
@@ -630,7 +667,32 @@
         '  <td class="blog-table__tags">' + p.tags.map(tagChip).join('') + '</td>' +
         '</tr>';
     }).join('');
-    return '<table class="blog-table"><thead><tr><th>Title</th><th>Date</th><th>Reading time</th><th>Tags</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    return '<table class="blog-table"><thead><tr><th>Title</th>' +
+      sortHeader('date', 'Date') + sortHeader('readingTime', 'Reading time') +
+      '<th>Tags</th></tr></thead><tbody>' + rows + '</tbody></table>';
+  }
+
+  /* Sortable column header: small up/down arrows, the active direction
+     highlighted. Click toggles ascending/descending; a new column starts
+     newest-first (date) or shortest-first (reading time). */
+  function sortHeader(key, label) {
+    var on = state.sortKey === key;
+    var dir = on ? state.sortDir : '';
+    var aria = on ? (dir === 'asc' ? 'ascending' : 'descending') : 'none';
+    return '<th aria-sort="' + aria + '"><button type="button" class="blog-table__sort' + (on ? ' is-active' : '') +
+      '" data-sort="' + key + '" title="Sort by ' + label.toLowerCase() + '">' + label +
+      '<span class="blog-table__arrows" aria-hidden="true">' +
+      '<span class="blog-table__arrow' + (dir === 'asc' ? ' is-on' : '') + '">&#9650;</span>' +
+      '<span class="blog-table__arrow' + (dir === 'desc' ? ' is-on' : '') + '">&#9660;</span>' +
+      '</span></button></th>';
+  }
+
+  function sortPosts(list) {
+    var key = state.sortKey, sign = state.sortDir === 'asc' ? 1 : -1;
+    return list.slice().sort(function (a, b) {
+      var d = key === 'readingTime' ? (a.readingTime || 0) - (b.readingTime || 0) : (a.ts || 0) - (b.ts || 0);
+      return d !== 0 ? sign * d : (b.ts || 0) - (a.ts || 0);
+    });
   }
 
   function renderPager(totalPages) {
@@ -662,6 +724,7 @@
     if (defaultPagination) defaultPagination.style.display = 'none';
 
     var filtered = posts.filter(matches);
+    if (state.view === 'table') filtered = sortPosts(filtered);
     var totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
     if (state.page > totalPages) state.page = totalPages;
     if (state.page < 1) state.page = 1;
@@ -731,6 +794,20 @@
       syncBrowseBarTagButtons();
       render();
       if (!fromBrowseBar && browseBar) browseBar.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+
+    var sortBtn = e.target.closest('[data-sort]');
+    if (sortBtn) {
+      var key = sortBtn.getAttribute('data-sort');
+      if (state.sortKey === key) {
+        state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.sortKey = key;
+        state.sortDir = key === 'date' ? 'desc' : 'asc';
+      }
+      state.page = 1;
+      render();
       return;
     }
 

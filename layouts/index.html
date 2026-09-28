@@ -49,16 +49,20 @@ $profileDept := $langProfile.department | default $globalProfile.department }}
     </p>
     {{ end }} {{/* Social links */}} {{ if .Site.Params.social }}
     <div class="profile__social">
+        {{/* Each contact is a button with a small grey caption under it.
+             `label` (optional, in hugo.yaml) is the short caption;
+             it falls back to `name`. */}}
         {{ range .Site.Params.social }}
         <a
             href="{{ .url }}"
-            class="social-icon"
+            class="profile__contact"
             title="{{ .name }}"
             target="_blank"
             rel="noopener noreferrer"
             aria-label="{{ .name }}"
         >
-            {{ partial "icons/icons.html" .icon }}
+            <span class="social-icon" aria-hidden="true">{{ partial "icons/icons.html" .icon }}</span>
+            <span class="profile__contact-label" aria-hidden="true">{{ .label | default .name }}</span>
         </a>
         {{ end }}
     </div>
@@ -131,13 +135,45 @@ $profileDept := $langProfile.department | default $globalProfile.department }}
         display: flex;
         flex-wrap: wrap;
         justify-content: center;
-        gap: var(--sp-3);
+        gap: var(--sp-4);
         margin-top: var(--sp-6);
     }
 
-    .profile__social .social-icon {
+    .profile__contact {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--sp-2);
+        min-width: 56px;
+        text-decoration: none;
+    }
+
+    /* the icon reads as a real button: surface, border, lift on hover */
+    .profile__contact .social-icon {
         width: 44px;
         height: 44px;
+        background: var(--color-bg);
+        border: 1px solid var(--color-border);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    .profile__contact:hover .social-icon,
+    .profile__contact:focus-visible .social-icon {
+        background: var(--color-accent-light);
+        border-color: var(--color-accent);
+        color: var(--color-accent);
+        transform: translateY(-1px);
+    }
+
+    .profile__contact-label {
+        font-size: clamp(0.7rem, 0.66rem + 0.2vw, 0.78rem);
+        line-height: 1.2;
+        color: var(--color-text-muted);
+        letter-spacing: 0.02em;
+    }
+
+    .profile__contact:hover .profile__contact-label {
+        color: var(--color-text-secondary);
     }
 
     /* -------------------------------------------------------------------

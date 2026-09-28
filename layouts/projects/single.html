@@ -50,6 +50,29 @@
   {{ with site.GetPage . }}{{ $related = $related | append . }}{{ end }}
 {{ end }}
 
+{{/* Collaborators: `collaborators` in front matter (a list) wins if set;
+     otherwise the co-authors of the project's own outputs - its paper and
+     patent buttons plus every paper/patent in `related` - minus the site
+     owner (matched on the last word of params.profile.name), in order of
+     first appearance. */}}
+{{ $collab := slice }}
+{{ with $p.collaborators }}
+  {{ $collab = . }}
+{{ else }}
+  {{ $selfLast := "" }}
+  {{ with site.Params.profile.name }}{{ $selfLast = index (last 1 (split . " ")) 0 }}{{ end }}
+  {{ $srcs := $related }}
+  {{ range slice $p.paper $p.patent }}
+    {{ with . }}{{ if not (hasPrefix . "http") }}{{ with site.GetPage . }}{{ $srcs = $srcs | append . }}{{ end }}{{ end }}{{ end }}
+  {{ end }}
+  {{ range $srcs }}
+    {{ range .Params.authors }}
+      {{ $isSelf := and $selfLast (in . $selfLast) }}
+      {{ if and (not $isSelf) (not (in $collab .)) }}{{ $collab = $collab | append . }}{{ end }}
+    {{ end }}
+  {{ end }}
+{{ end }}
+
 {{/* External resources: `resources` list + legacy `website` (label = host) */}}
 {{ $resources := slice }}
 {{ range $p.resources }}
@@ -77,6 +100,9 @@
 
     <h1 class="project-head__title">{{ .Title }}</h1>
     {{ with .Description }}<p class="project-head__lead">{{ . }}</p>{{ end }}
+    {{/* Names with a homepage in data/collaborators.yaml (name: url) become links. */}}
+    {{ with $collab }}<p class="project-head__collab"><span class="project-head__collab-label">Collaborators:</span>
+      {{ range $i, $name := . }}{{ if $i }}, {{ end }}{{ with index (site.Data.collaborators | default dict) $name }}<a href="{{ . }}" target="_blank" rel="noopener">{{ $name }}</a>{{ else }}{{ $name }}{{ end }}{{ end }}</p>{{ end }}
 
     {{/* Labeled buttons (not icon-only like the list cards): on its own
          page a project's outputs are the point, so say what each one is. */}}
@@ -306,6 +332,19 @@
     font-size: var(--fs-xl); line-height: var(--lh-normal);
     color: var(--color-text-secondary); text-wrap: pretty;
   }
+
+  .project-head__collab {
+    margin-top: var(--sp-3);
+    font-size: var(--fs-sm); line-height: var(--lh-normal);
+    color: var(--color-text-muted);
+  }
+  .project-head__collab-label { font-weight: 600; color: var(--color-text-secondary); }
+  .project-head__collab a {
+    color: inherit; text-decoration: underline;
+    text-decoration-color: var(--color-border); text-underline-offset: 0.2em;
+    transition: color 0.15s ease, text-decoration-color 0.15s ease;
+  }
+  .project-head__collab a:hover { color: var(--color-link-hover); text-decoration-color: currentColor; }
 
   .project-links { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-6); }
   .project-link {
