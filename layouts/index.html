@@ -8,19 +8,25 @@ $profileDept := $langProfile.department | default $globalProfile.department }}
 
 <section class="profile">
     {{/* Profile image */}} {{ with $globalProfile.image }}
-    {{ $imgSrc := . | relURL }}
-    {{ $webpSrc := $imgSrc | replaceRE `[^/]+\.(jpg|jpeg|png)$` "profile.webp" }}
+    {{/* WebP twin = same path with a .webp extension, used only if it exists.
+         Each URL gets ?v=<content hash> so a replaced photo shows up at once
+         instead of the browser (or GitHub Pages' CDN) serving a cached copy. */}}
+    {{ $img := . }}
+    {{ $webp := replaceRE `\.(jpg|jpeg|png)$` ".webp" $img }}
+    {{ $ver := "" }}{{ with printf "static%s" $img }}{{ if fileExists . }}{{ $ver = printf "?v=%s" (substr (md5 (readFile .)) 0 8) }}{{ end }}{{ end }}
+    {{ $webpVer := "" }}{{ $hasWebp := false }}{{ with printf "static%s" $webp }}{{ if fileExists . }}{{ $hasWebp = true }}{{ $webpVer = printf "?v=%s" (substr (md5 (readFile .)) 0 8) }}{{ end }}{{ end }}
+    {{ $imgSrc := printf "%s%s" ($img | relURL) $ver }}
     <div class="profile__image-wrapper">
         <picture>
-            <source srcset="{{ $webpSrc }}" type="image/webp">
+            {{ if $hasWebp }}<source srcset="{{ printf "%s%s" ($webp | relURL) $webpVer }}" type="image/webp">{{ end }}
             <img
                 src="{{ $imgSrc }}"
                 alt="{{ $globalProfile.name }}"
                 class="profile__image"
                 loading="eager"
                 fetchpriority="high"
-                width="500"
-                height="667"
+                width="600"
+                height="600"
             />
         </picture>
     </div>
