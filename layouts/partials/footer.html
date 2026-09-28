@@ -8,17 +8,28 @@
             {{ $copyright = replace $copyright "{author}" (.Site.Params.author | default .Site.Title) }}
             <span>{{ $copyright | safeHTML }}</span>
 
-            {{/* Powered by */}}
-            {{ if .Site.Params.footer.poweredBy | default true }}
+            {{/* Powered by. With footer.upstreamURL set (a fork), this reads
+                 "Created using Hugo & <themeName>, a fork of <upstreamName>";
+                 otherwise it falls back to "Powered by Hugo & Academia". */}}
+            {{ with .Site.Params.footer | default dict }}{{ if ne .poweredBy false }}
+            {{ $themeURL := .themeURL | default "https://github.com/joaocarlos/hugo-academia" }}
             <span class="footer__separator"> · </span>
             <span>
+                {{ if .upstreamURL }}
+                {{ i18n "created_using" | default "Created using" }}
+                <a href="https://gohugo.io/" target="_blank" rel="noopener noreferrer">Hugo</a>
+                &amp;
+                <a href="{{ $themeURL }}" target="_blank" rel="noopener noreferrer">{{ .themeName | default "Academia" }}</a>,
+                {{ i18n "fork_of" | default "a fork of" }}
+                <a href="{{ .upstreamURL }}" target="_blank" rel="noopener noreferrer">{{ .upstreamName | default "Academia" }}</a>
+                {{ else }}
                 {{ i18n "powered_by" | default "Powered by" }}
                 <a href="https://gohugo.io/" target="_blank" rel="noopener noreferrer">Hugo</a>
                 &amp;
-                {{/* footer.themeURL in hugo.yaml overrides this (e.g. to point at a fork) */}}
-                <a href="{{ .Site.Params.footer.themeURL | default "https://github.com/joaocarlos/hugo-academia" }}" target="_blank" rel="noopener noreferrer">Academia</a>
+                <a href="{{ $themeURL }}" target="_blank" rel="noopener noreferrer">{{ .themeName | default "Academia" }}</a>
+                {{ end }}
             </span>
-            {{ end }}
+            {{ end }}{{ end }}
         </div>
     </div>
 </footer>
