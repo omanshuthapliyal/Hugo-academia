@@ -1,0 +1,27 @@
+{{/* Picks the image shown when a page is shared (LinkedIn, X, Slack...).
+     Returns a dict: url, width, height, large (true = wide preview card).
+       1. project pages: the card image (`image`, 16:9)
+       2. page bundles (e.g. blog posts with figures): a resource whose name
+          contains feature, cover or thumb, else the first image in the bundle
+       3. everything else: the profile photo */}}
+{{ $out := dict }}
+{{ $static := "" }}
+{{ if and (eq .Section "projects") .IsPage .Params.image }}
+  {{ $static = .Params.image }}
+{{ else if .IsPage }}
+  {{ $imgs := slice }}
+  {{ range .Resources.ByType "image" }}{{ if in (slice "image/png" "image/jpeg" "image/webp" "image/gif") .MediaType.Type }}{{ $imgs = $imgs | append . }}{{ end }}{{ end }}
+  {{ $pick := "" }}
+  {{ range $imgs }}{{ if and (not $pick) (findRE `(?i)(feature|cover|thumb)` .Name) }}{{ $pick = . }}{{ end }}{{ end }}
+  {{ if and (not $pick) $imgs }}{{ $pick = index $imgs 0 }}{{ end }}
+  {{ with $pick }}
+    {{ $out = dict "url" .Permalink "width" .Width "height" .Height "large" (ge .Width 600) }}
+  {{ end }}
+{{ end }}
+{{ if not $out }}
+  {{ if not $static }}{{ $static = site.Params.profile.image | default "/images/profile.jpg" }}{{ end }}
+  {{ $w := 0 }}{{ $h := 0 }}
+  {{ with printf "static%s" $static }}{{ if fileExists . }}{{ with imageConfig . }}{{ $w = .Width }}{{ $h = .Height }}{{ end }}{{ end }}{{ end }}
+  {{ $out = dict "url" ($static | absURL) "width" $w "height" $h "large" (and (ge $w 600) (gt $w $h)) }}
+{{ end }}
+{{ return $out }}
