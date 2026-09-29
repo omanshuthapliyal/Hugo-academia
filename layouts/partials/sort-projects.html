@@ -1,0 +1,16 @@
+{{/* Returns project pages newest first by a date param ("start_date" or
+     "end_date", passed as .field). Projects with the same date are ordered
+     by the optional front-matter `weight` (lower comes first; unweighted
+     projects come after weighted ones). Usage:
+       {{ $sorted := partial "sort-projects.html" (dict "pages" $pages "field" "start_date") }} */}}
+{{ $rows := slice }}
+{{ range .pages }}
+  {{ $d := index .Params $.field }}
+  {{ $dstr := "0000-00-00" }}{{ with $d }}{{ $dstr = (time .).Format "2006-01-02" }}{{ end }}
+  {{ $w := int (.Params.weight | default 999) }}
+  {{ $key := printf "%s|%03d" $dstr (sub 999 $w) }}
+  {{ $rows = $rows | append (dict "key" $key "page" .) }}
+{{ end }}
+{{ $out := slice }}
+{{ range sort $rows "key" "desc" }}{{ $out = $out | append .page }}{{ end }}
+{{ return $out }}

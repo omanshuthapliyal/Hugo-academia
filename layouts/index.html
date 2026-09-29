@@ -104,7 +104,7 @@ $profileDept := $langProfile.department | default $globalProfile.department }}
 {{ if $showHighlights }}
 {{ with $projectsSection }}
   {{ $activeProjects := where .Pages ".Params.status" "active" }}
-  {{ $recentActiveProjects = first 3 (sort $activeProjects ".Params.start_date" "desc") }}
+  {{ $recentActiveProjects = first 3 (partial "sort-projects.html" (dict "pages" $activeProjects "field" "start_date")) }}
 {{ end }}
 {{ end }}
 

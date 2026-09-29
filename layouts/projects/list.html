@@ -3,11 +3,11 @@
 {{ $active := where .Pages ".Params.status" "active" }}
 {{ $completed := where .Pages ".Params.status" "completed" }}
 
-{{/* Sort active projects by start_date descending (newest first) */}}
-{{ $activeSorted := sort $active ".Params.start_date" "desc" }}
-
-{{/* Sort completed projects by end_date descending (most recently completed first) */}}
-{{ $completedSorted := sort $completed ".Params.end_date" "desc" }}
+{{/* Active: newest start_date first; completed: most recently ended first.
+     Ties are broken by the optional `weight` (lower first) - see
+     partials/sort-projects.html. */}}
+{{ $activeSorted := partial "sort-projects.html" (dict "pages" $active "field" "start_date") }}
+{{ $completedSorted := partial "sort-projects.html" (dict "pages" $completed "field" "end_date") }}
 
 {{/* Topic filter = BROAD topics from data/topics.yaml (each groups several
      fine-grained project tags), in that file's order, listing only topics
