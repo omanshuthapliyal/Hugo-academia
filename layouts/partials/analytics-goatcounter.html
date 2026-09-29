@@ -1,0 +1,20 @@
+{{/* GoatCounter: cookieless, privacy-friendly page-view counting.
+     Enabled by params.analytics.goatcounter: "<code>" in hugo.yaml, where
+     <code> is your site code (https://<code>.goatcounter.com). Only loads
+     in production builds, so `hugo server` previews are never counted.
+     Also records clicks on PDF links (CV, papers) and on links to other
+     sites as events named "click: <url>". */}}
+{{ with site.Params.analytics.goatcounter }}{{ if hugo.IsProduction }}
+<script data-goatcounter="https://{{ . }}.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+<script>
+document.addEventListener('click', function (e) {
+  var a = e.target.closest && e.target.closest('a[href]');
+  if (!a || !window.goatcounter || !window.goatcounter.count) return;
+  var url = new URL(a.href, location.href);
+  var isPdf = /\.pdf($|\?)/i.test(url.pathname);
+  var isExternal = url.host !== location.host;
+  if (!isPdf && !isExternal) return;
+  window.goatcounter.count({ path: 'click: ' + url.href, title: (a.textContent || '').trim().slice(0, 100), event: true });
+});
+</script>
+{{ end }}{{ end }}

@@ -255,5 +255,6 @@
   {{ if .Site.Params.analytics.google }}
     {{ template "_internal/google_analytics.html" . }}
   {{ end }}
+  {{ partial "analytics-goatcounter.html" . }}
 </body>
 </html>
