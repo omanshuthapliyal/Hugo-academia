@@ -468,3 +468,64 @@ copyButtonStyles.textContent = `
   }
 `;
 document.head.appendChild(copyButtonStyles);
+
+// Cite buttons (partials/content-links.html): open the paper's BibTeX in a
+// dialog with Copy and Download. One dialog per page, built on first use.
+(function () {
+  var dialog = null, pre, titleEl, copyBtn, dlLink;
+  function build() {
+    dialog = document.createElement('dialog');
+    dialog.className = 'cite-dialog';
+    dialog.setAttribute('aria-labelledby', 'cite-dialog-title');
+    dialog.innerHTML =
+      '<div class="cite-dialog__head">' +
+        '<div><p class="cite-dialog__label" id="cite-dialog-title">Cite this paper</p>' +
+        '<p class="cite-dialog__paper"></p></div>' +
+        '<button type="button" class="cite-dialog__close" aria-label="Close">&times;</button>' +
+      '</div>' +
+      '<pre class="cite-dialog__bib" tabindex="0"></pre>' +
+      '<div class="cite-dialog__actions">' +
+        '<a class="cite-dialog__btn" download>Download .bib</a>' +
+        '<button type="button" class="cite-dialog__btn cite-dialog__btn--primary">Copy BibTeX</button>' +
+      '</div>';
+    document.body.appendChild(dialog);
+    pre = dialog.querySelector('.cite-dialog__bib');
+    titleEl = dialog.querySelector('.cite-dialog__paper');
+    copyBtn = dialog.querySelector('.cite-dialog__btn--primary');
+    dlLink = dialog.querySelector('a.cite-dialog__btn');
+    dialog.querySelector('.cite-dialog__close').addEventListener('click', function () { dialog.close(); });
+    // Click on the backdrop (outside the box) closes it.
+    dialog.addEventListener('click', function (e) { if (e.target === dialog) dialog.close(); });
+    copyBtn.addEventListener('click', function () {
+      var text = pre.textContent;
+      function done() {
+        copyBtn.textContent = 'Copied';
+        setTimeout(function () { copyBtn.textContent = 'Copy BibTeX'; }, 1600);
+      }
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(done, fallback);
+      } else { fallback(); }
+      function fallback() {
+        var r = document.createRange(); r.selectNodeContents(pre);
+        var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+        try { document.execCommand('copy'); done(); } catch (err) {}
+      }
+    });
+  }
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest && e.target.closest('.content-links__cite');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (!dialog) build();
+    var bib = btn.getAttribute('data-bibtex') || '';
+    pre.textContent = bib;
+    titleEl.textContent = btn.getAttribute('data-cite-title') || '';
+    var key = (bib.match(/@\w+\{([^,]+),/) || [])[1] || 'citation';
+    if (dlLink.href && dlLink.href.indexOf('blob:') === 0) URL.revokeObjectURL(dlLink.href);
+    dlLink.href = URL.createObjectURL(new Blob([bib + '\n'], { type: 'application/x-bibtex' }));
+    dlLink.setAttribute('download', key + '.bib');
+    copyBtn.textContent = 'Copy BibTeX';
+    if (typeof dialog.showModal === 'function') dialog.showModal(); else dialog.setAttribute('open', '');
+  });
+})();

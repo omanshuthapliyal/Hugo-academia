@@ -25,7 +25,16 @@
   {{ end }}
 {{ end }}
 
-{{ $hasLinks := or $page.Params.doi $page.Params.pdf $page.Params.code $page.Params.slides $page.Params.poster $page.Params.video $blogPost $page.Params.website }}
+{{/* Cite: BibTeX lives in data/citations.yaml, keyed by the paper's file
+     name (content/papers/pub7.md -> pub7), so no paper file has to change.
+     The button carries the entry itself; assets/js/main.js opens it in a
+     small dialog with a Copy button. No entry, no button. */}}
+{{ $bibtex := "" }}
+{{ if and $page.File (eq $page.Section "papers") }}
+  {{ with index (site.Data.citations | default dict) $page.File.ContentBaseName }}{{ $bibtex = strings.TrimSpace . }}{{ end }}
+{{ end }}
+
+{{ $hasLinks := or $page.Params.doi $page.Params.pdf $page.Params.code $page.Params.slides $page.Params.poster $page.Params.video $blogPost $page.Params.website $bibtex }}
 
 {{ if $hasLinks }}
 <div class="content-links">
@@ -78,6 +87,12 @@
         <span class="visually-hidden">Website</span>
     </a>
     {{ end }}
+    {{ with $bibtex }}
+    <button type="button" class="content-links__link content-links__cite" title="Cite (BibTeX)" data-cite-title="{{ $page.Title }}" data-bibtex="{{ . }}">
+        {{ partial "icons/icons.html" "quote" }}
+        <span class="visually-hidden">Cite</span>
+    </button>
+    {{ end }}
 </div>
 
 <style>
@@ -113,6 +128,12 @@
         color: var(--color-accent);
         border-color: var(--color-accent);
         background: var(--color-bg-alt);
+    }
+
+    button.content-links__link {
+        padding: 0;
+        font: inherit;
+        cursor: pointer;
     }
 
     .content-links__link svg {
