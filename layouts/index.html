@@ -35,10 +35,10 @@ $profileDept := $langProfile.department | default $globalProfile.department }}
         {{ $globalProfile.name | default .Site.Title }}
     </h1>
 
-    {{/* Title & Institution */}} {{ with $profileTitle }}
-    <p class="profile__title">
-        {{ . }}{{ with $profileDept }}, {{ . }}{{ end }}
-    </p>
+    {{/* Title, then lab and institution each on their own line */}} {{ with $profileTitle }}
+    <p class="profile__title">{{ . }}</p>
+    {{ end }} {{ with $profileDept }}
+    <p class="profile__institution profile__department">{{ . }}</p>
     {{ end }} {{ with $profileInst }}
     <p class="profile__institution">
         {{ . }}{{ with $globalProfile.location }}, {{ . }}{{ end }}
