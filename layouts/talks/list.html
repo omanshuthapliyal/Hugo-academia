@@ -1,0 +1,281 @@
+{{ define "main" }}
+{{/* Talks page. Entries come from data/talks.yaml (see the comments there).
+     An entry that points at a paper ("papers/pubN") inherits its title,
+     authors, venue, year and slides/poster/video links, so each talk is only
+     written down once. Layout: Upcoming, then one group per year (newest
+     first), then thesis defenses. Reuses the Publications list styling. */}}
+
+{{ $now := now }}
+{{ $rows := slice }}
+{{ range site.Data.talks }}
+  {{ $e := . }}
+  {{ $p := "" }}{{ with $e.paper }}{{ with site.GetPage . }}{{ $p = . }}{{ end }}{{ end }}
+  {{ $title := $e.title }}{{ if and (not $title) $p }}{{ $title = $p.Title }}{{ end }}
+  {{ $event := $e.event }}{{ if and (not $event) $p }}{{ $event = $p.Params.venue }}{{ end }}
+  {{ $authors := slice }}{{ with $p }}{{ $authors = .Params.authors | default slice }}{{ end }}
+  {{ $date := "" }}{{ with $e.date }}{{ $date = time . }}{{ end }}
+  {{ $year := $e.year }}
+  {{ if not $year }}{{ with $date }}{{ $year = .Year }}{{ else }}{{ with $p }}{{ $year = .Params.year | default .Date.Year }}{{ end }}{{ end }}{{ end }}
+  {{ $sortDate := printf "%v-00-00" $year }}
+  {{ with $date }}{{ $sortDate = .Format "2006-01-02" }}{{ else }}{{ with $p }}{{ $sortDate = .Date.Format "2006-01-02" }}{{ end }}{{ end }}
+  {{ $slides := $e.slides }}{{ if and (not $slides) $p }}{{ $slides = $p.Params.slides }}{{ end }}
+  {{ $poster := $e.poster }}{{ if and (not $poster) $p }}{{ $poster = $p.Params.poster }}{{ end }}
+  {{ $video := $e.video }}{{ if and (not $video) $p }}{{ $video = $p.Params.video }}{{ end }}
+  {{ $paperLink := "" }}
+  {{ with $p }}{{ with .Params.doi }}{{ $paperLink = printf "https://doi.org/%s" . }}{{ else }}{{ with $p.Params.pdf }}{{ $paperLink = . }}{{ else }}{{ $paperLink = $p.RelPermalink }}{{ end }}{{ end }}{{ end }}
+  {{ $kind := $e.kind | default "talk" }}
+  {{ $upcoming := false }}{{ with $date }}{{ if and (.After $now) (ne $kind "defense") }}{{ $upcoming = true }}{{ end }}{{ end }}
+  {{ $rows = $rows | append (dict
+      "kind" $kind "title" $title "event" $event "authors" $authors
+      "date" $date "year" $year "sort" $sortDate "location" $e.location "award" $e.award
+      "slides" $slides "poster" $poster "video" $video "paper" $paperLink "upcoming" $upcoming) }}
+{{ end }}
+
+{{ $upcoming := where $rows "upcoming" true }}
+{{ $past := where (where $rows "upcoming" false) "kind" "ne" "defense" }}
+{{ $defenses := where $rows "kind" "defense" }}
+{{ $years := slice }}{{ range $past }}{{ if not (in $years .year) }}{{ $years = $years | append .year }}{{ end }}{{ end }}
+{{ $years = sort $years "value" "desc" }}
+{{ $kinds := slice }}{{ range $rows }}{{ if not (in $kinds .kind) }}{{ $kinds = $kinds | append .kind }}{{ end }}{{ end }}
+
+<div class="layout-with-toc">
+  <div class="publications-content">
+    <header class="section-header">
+      <h1 class="section-header__title">{{ .Title }}</h1>
+      {{ with .Description }}<p class="section-header__description">{{ . }}</p>{{ end }}
+    </header>
+
+    {{ with $upcoming }}
+    <section class="publications-year talks-group" id="upcoming">
+      <header class="publications-year__header">
+        <h2 class="publications-year__title">Upcoming</h2>
+      </header>
+      <div class="publications-list">{{ range sort . "sort" "asc" }}{{ partial "talk-item.html" . }}{{ end }}</div>
+    </section>
+    {{ end }}
+
+    {{ range $years }}
+    {{ $y := . }}
+    {{ $items := where $past "year" $y }}
+    <section class="publications-year talks-group" id="year-{{ $y }}">
+      <header class="publications-year__header">
+        <h2 class="publications-year__title">{{ $y }}</h2>
+      </header>
+      <div class="publications-list">{{ range sort $items "sort" "desc" }}{{ partial "talk-item.html" . }}{{ end }}</div>
+    </section>
+    {{ end }}
+
+    {{ with $defenses }}
+    <section class="publications-year talks-group" id="defenses">
+      <header class="publications-year__header">
+        <h2 class="publications-year__title">Dissertations</h2>
+      </header>
+      <div class="publications-list">{{ range sort . "sort" "desc" }}{{ partial "talk-item.html" . }}{{ end }}</div>
+    </section>
+    {{ end }}
+
+    <p class="list__empty" id="talks-filter-empty" hidden>Nothing matches this filter.</p>
+  </div>
+
+  <aside class="publications-sidebar" aria-label="Filter talks">
+    <div class="talks-filter" id="talks-filter">
+      <p class="talks-filter__label">Filter by type</p>
+      <div class="talks-filter__chips" role="group" aria-label="Type">
+        <button type="button" class="talks-filter__chip is-active" data-kind-filter="all">All</button>
+        {{ range slice "talk" "poster" "defense" }}{{ if in $kinds . }}
+        <button type="button" class="talks-filter__chip" data-kind-filter="{{ . }}">{{ if eq . "talk" }}Talks{{ else if eq . "poster" }}Posters{{ else }}Dissertations{{ end }}</button>
+        {{ end }}{{ end }}
+      </div>
+    </div>
+  </aside>
+</div>
+
+<style>
+  .publications-content { max-width: var(--max-width-content); }
+    /* Shared list styling copied from papers/list.html (page-scoped there). */
+    /* Year Section */
+    .publications-year {
+        margin-bottom: var(--sp-10);
+        scroll-margin-top: calc(var(--header-height) + var(--sp-4));
+    }
+
+    .publications-year__header {
+        display: flex;
+        align-items: baseline;
+        gap: var(--sp-3);
+        margin-bottom: var(--sp-4);
+        padding-bottom: var(--sp-2);
+        border-bottom: 2px solid var(--color-border-subtle);
+    }
+
+    .publications-year__title {
+        font-family: var(--font-serif);
+        font-size: var(--fs-2xl);
+        font-weight: 600;
+        border-bottom: 0;
+        margin: 0;
+        padding: 0;
+        line-height: 1.2;
+    }
+
+    .publications-year__count {
+        font-size: var(--fs-xs);
+        font-weight: 500;
+        color: var(--color-text-muted);
+        background: var(--color-bg-alt);
+        padding: var(--sp-1) var(--sp-2);
+        border-radius: var(--radius-sm);
+    }
+
+    /* Category Subsection */
+    .publications-category {
+        margin-bottom: var(--sp-6);
+        margin-top: var(--sp-4);
+    }
+
+    .publications-category:last-child {
+        margin-bottom: 0;
+    }
+
+    .publications-category__title {
+        font-family: var(--font-sans);
+        font-size: var(--fs-sm);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--color-text-muted);
+        margin-bottom: var(--sp-3);
+    }
+
+    /* Publications List */
+    .publications-list {
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Publication Item - Compact Inline */
+    .publication {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: var(--sp-4);
+        align-items: center;
+        padding: var(--sp-4) var(--sp-3);
+        margin: 0 calc(-1 * var(--sp-3));
+        border-bottom: 1px solid var(--color-border-subtle);
+        border-radius: var(--radius-sm);
+        transition: background var(--duration-fast) var(--ease-out);
+    }
+
+    .publication:hover {
+        background: var(--color-bg-alt);
+    }
+
+    .publication:last-child {
+        border-bottom: none;
+    }
+
+    .publication__content {
+        min-width: 0;
+    }
+
+    .publication__title {
+        font-family: var(--font-serif);
+        font-size: var(--fs-lg);
+        font-weight: 600;
+        line-height: 1.4;
+        margin-bottom: var(--sp-1);
+    }
+
+    .publication__title a {
+        color: var(--color-text);
+        text-decoration: none;
+        transition: color var(--duration-fast) var(--ease-out);
+    }
+
+    .publication__title a:hover {
+        color: var(--color-accent);
+    }
+
+    .publication__meta {
+        font-size: var(--fs-sm);
+        line-height: 1.5;
+    }
+
+    .publication__authors {
+        color: var(--color-text-secondary);
+    }
+
+    .publication__venue {
+        display: block;
+        font-style: italic;
+        color: var(--color-text-muted);
+        margin-top: var(--sp-1);
+    }
+
+
+  .talks-filter { position: sticky; top: calc(var(--header-height, 64px) + var(--sp-6)); }
+  .talks-filter__label {
+    font-family: var(--font-sans); font-size: var(--fs-xs); font-weight: 600;
+    letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-secondary);
+    margin-bottom: var(--sp-3);
+  }
+  .talks-filter__chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+  .talks-filter__chip {
+    font-family: var(--font-sans); font-size: var(--fs-xs);
+    padding: var(--sp-1) var(--sp-3); border-radius: var(--radius-full, 999px);
+    border: 1px solid var(--color-border); background: var(--color-bg-alt);
+    color: var(--color-text-secondary); cursor: pointer;
+    transition: all var(--duration-fast) var(--ease-out);
+  }
+  .talks-filter__chip:hover { border-color: var(--color-accent); color: var(--color-accent); }
+  .talks-filter__chip.is-active { background: var(--color-accent); border-color: var(--color-accent); color: #fff; }
+  @media (max-width: 1023px) { .talks-filter { position: static; margin-top: var(--sp-8); } }
+
+  .talk__kind--poster { background: var(--color-accent-2-light); color: var(--color-accent-2); }
+  .talk__kind--defense { background: var(--color-bg-alt); color: var(--color-text-secondary); }
+  .talk__award {
+    display: inline-flex; align-items: center; gap: 0.3em;
+    background: var(--color-accent-light); color: var(--color-accent); font-weight: 600;
+  }
+  .talk__award svg { width: 12px; height: 12px; }
+  .talk__links { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-2); max-width: 240px; }
+  .talk[hidden] { display: none; }
+  .talk .publication__tags { margin-top: var(--sp-2); }
+  @media (max-width: 640px) { .talk { grid-template-columns: 1fr; } .talk__links { justify-content: flex-start; max-width: none; } }
+  .talk__link {
+    display: inline-flex; align-items: center; gap: var(--sp-1);
+    font-family: var(--font-sans); font-size: var(--fs-xs);
+    padding: var(--sp-1) var(--sp-3); border: 1px solid var(--color-border);
+    border-radius: var(--radius-full, 999px); color: var(--color-text-secondary);
+    text-decoration: none; transition: all var(--duration-fast) var(--ease-out); white-space: nowrap;
+  }
+  .talk__link:hover { color: var(--color-accent); border-color: var(--color-accent); }
+  .talk__link svg { width: 14px; height: 14px; }
+  .talk .publication__title a { color: var(--color-text); text-decoration: none; }
+  .talk .publication__title a:hover { color: var(--color-accent); }
+</style>
+
+<script>
+(function () {
+  var bar = document.getElementById('talks-filter');
+  if (!bar) return;
+  var chips = Array.prototype.slice.call(bar.querySelectorAll('[data-kind-filter]'));
+  var items = Array.prototype.slice.call(document.querySelectorAll('.talk'));
+  var groups = Array.prototype.slice.call(document.querySelectorAll('.talks-group'));
+  var empty = document.getElementById('talks-filter-empty');
+  function render(kind) {
+    var shown = 0;
+    items.forEach(function (it) {
+      var ok = kind === 'all' || it.getAttribute('data-kind') === kind;
+      it.hidden = !ok; if (ok) shown++;
+    });
+    groups.forEach(function (g) {
+      g.hidden = !Array.prototype.some.call(g.querySelectorAll('.talk'), function (t) { return !t.hidden; });
+    });
+    chips.forEach(function (c) { c.classList.toggle('is-active', c.getAttribute('data-kind-filter') === kind); });
+    if (empty) empty.hidden = shown > 0;
+  }
+  chips.forEach(function (c) { c.addEventListener('click', function () { render(c.getAttribute('data-kind-filter')); }); });
+})();
+</script>
+{{ end }}

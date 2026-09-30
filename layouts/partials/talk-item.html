@@ -1,0 +1,27 @@
+{{/* One row on the Talks page. Input: the dict built in talks/list.html. */}}
+{{ $t := . }}
+{{ $kindLabel := "Talk" }}{{ if eq $t.kind "poster" }}{{ $kindLabel = "Poster" }}{{ else if eq $t.kind "defense" }}{{ $kindLabel = "Dissertation" }}{{ end }}
+<article class="publication talk" data-kind="{{ $t.kind }}">
+  <div class="publication__content">
+    <h3 class="publication__title">
+      {{ with $t.paper }}<a href="{{ . }}"{{ if hasPrefix . "http" }} target="_blank" rel="noopener"{{ end }}>{{ $t.title }}</a>{{ else }}{{ $t.title }}{{ end }}
+    </h3>
+    <div class="publication__meta">
+      {{ with $t.authors }}<span class="publication__authors">{{ partial "author-list.html" (dict "authors" .) }}</span>{{ end }}
+      <span class="publication__venue">{{ $t.event }}{{ with $t.location }} · {{ . }}{{ end }}{{ with $t.date }} · {{ .Format "Jan 2, 2006" }}{{ end }}</span>
+    </div>
+    <div class="publication__tags">
+      <span class="tag tag--type talk__kind talk__kind--{{ $t.kind }}">{{ $kindLabel }}</span>
+      {{ with $t.award }}<span class="tag talk__award">{{ partial "icons/icons.html" "lightbulb" }}{{ . }}</span>{{ end }}
+    </div>
+  </div>
+  {{ if or $t.slides $t.poster $t.video $t.paper }}
+  <div class="talk__links">
+    {{ with $t.slides }}<a class="talk__link" href="{{ . }}" target="_blank" rel="noopener">{{ partial "icons/icons.html" "slides" }}Slides</a>{{ end }}
+    {{ with $t.poster }}<a class="talk__link" href="{{ . }}" target="_blank" rel="noopener">{{ partial "icons/icons.html" "slides" }}Poster</a>{{ end }}
+    {{ with $t.video }}<a class="talk__link" href="{{ . }}" target="_blank" rel="noopener">{{ partial "icons/icons.html" "youtube" }}Video</a>{{ end }}
+    {{ with $t.paper }}<a class="talk__link" href="{{ . }}"{{ if hasPrefix . "http" }} target="_blank" rel="noopener"{{ end }}>{{ partial "icons/icons.html" "file-text" }}Paper</a>{{ end }}
+  </div>
+  {{ end }}
+</article>
+
