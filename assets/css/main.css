@@ -915,8 +915,8 @@ main {
 }
 
 .profile__bio {
-    max-width: 600px;
-    font-size: var(--fs-base);
+    max-width: 680px;
+    font-size: 1.125rem; /* 18px at every screen size */
     line-height: var(--lh-relaxed);
     color: var(--color-text-secondary);
     margin-bottom: var(--sp-4);
