@@ -13,7 +13,8 @@
        description  replaces the plot's own sub-heading/description text;
                description="" hides it (optional; omit to keep the original)
        height  starting height in px before the report reports its own (default 640)
-       wide    "true" breaks out of the 720px text column, up to 1100px (default true)
+       wide    "true" breaks out of the text column, up to 1100px (default false:
+               plots sit in the normal post column like any other figure)
        caption "true" shows the title as a caption under the plot (default false)
 
      The iframe follows the site's light/dark toggle by passing theme= in the
@@ -24,7 +25,7 @@
 {{- $title := .Get "title" | default $heading | default "Interactive figure" -}}
 {{- $hasDesc := isset .Params "description" -}}
 {{- $height := .Get "height" | default "640" -}}
-{{- $wide := ne (printf "%v" (.Get "wide")) "false" -}}
+{{- $wide := eq (printf "%v" (.Get "wide")) "true" -}}
 {{- $caption := eq (printf "%v" (.Get "caption")) "true" -}}
 {{- $url := relURL $src -}}
 {{- $hash := cond (ne $plot "") (printf "plot=%s&embed" $plot) "embed" -}}
