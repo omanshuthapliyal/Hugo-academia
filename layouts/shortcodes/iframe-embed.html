@@ -1,0 +1,126 @@
+{{/* Embed a self-contained interactive HTML report (e.g. a Listening Timeline
+     plot) in a post. The HTML file lives under /static so Hugo copies it
+     verbatim instead of treating it as a content page.
+
+     Usage:
+       {{< iframe-embed src="embeds/listening/map.html" plot="map" title="Where my listening comes from" >}}
+
+     Parameters:
+       src     path under /static (required)
+       plot    value for the report's #plot= hash (optional)
+       title   accessible title + caption (optional; defaults to heading)
+       heading replaces the plot's own heading text (optional)
+       description  replaces the plot's own sub-heading/description text;
+               description="" hides it (optional; omit to keep the original)
+       height  starting height in px before the report reports its own (default 640)
+       wide    "true" breaks out of the 720px text column, up to 1100px (default true)
+       caption "true" shows the title as a caption under the plot (default false)
+
+     The iframe follows the site's light/dark toggle by passing theme= in the
+     hash, and resizes itself from the report's postMessage height. */}}
+{{- $src := .Get "src" -}}
+{{- $plot := .Get "plot" -}}
+{{- $heading := .Get "heading" -}}
+{{- $title := .Get "title" | default $heading | default "Interactive figure" -}}
+{{- $hasDesc := isset .Params "description" -}}
+{{- $height := .Get "height" | default "640" -}}
+{{- $wide := ne (printf "%v" (.Get "wide")) "false" -}}
+{{- $caption := eq (printf "%v" (.Get "caption")) "true" -}}
+{{- $url := relURL $src -}}
+{{- $hash := cond (ne $plot "") (printf "plot=%s&embed" $plot) "embed" -}}
+<figure class="iframe-embed{{ if $wide }} iframe-embed--wide{{ end }}">
+  <iframe data-src="{{ $url }}" data-hash="{{ $hash }}" src="{{ printf "%s#%s" $url $hash | safeURL }}"
+    {{- with $heading }} data-heading="{{ . }}"{{ end }}
+    {{- if $hasDesc }} data-description="{{ .Get "description" }}"{{ end }}
+    title="{{ $title }}" loading="lazy" allowfullscreen scrolling="no"
+    style="width:100%;border:0;display:block;height:{{ $height }}px"></iframe>
+  {{- if $caption }}
+  <figcaption class="iframe-embed__caption">
+    {{ $title }}
+  </figcaption>
+  {{- end }}
+</figure>
+{{- if not (.Page.Store.Get "iframeEmbedInit") }}
+{{- .Page.Store.Set "iframeEmbedInit" true }}
+<style>
+  .iframe-embed { margin: 2rem 0; }
+  .iframe-embed iframe { border-radius: 8px; background: transparent; }
+  .iframe-embed--wide {
+    width: min(1100px, calc(100vw - 32px));
+    position: relative; left: 50%; transform: translateX(-50%);
+  }
+  .iframe-embed__caption { font-size: .85em; opacity: .75; margin-top: .5rem; text-align: center; }
+</style>
+<script>
+  (function () {
+    // Embedded reports never scroll internally: a scrollbar appearing inside
+    // the frame narrows the chart, which changes its height, which resizes
+    // the frame, which removes the scrollbar... (visible as jitter whenever
+    // the OS shows classic scrollbars). The frame is sized to fit instead.
+    function lock(f) {
+      try {
+        var d = f.contentDocument;
+        if (!d || !d.documentElement) return;
+        d.documentElement.style.overflow = 'hidden';
+        if (d.body) d.body.style.overflow = 'hidden';
+      } catch (err) { /* cross-origin: rely on scrolling="no" */ }
+    }
+    // Optional heading/description overrides. Applied after the report
+    // renders and re-applied if it re-renders. The original description is
+    // hidden (not removed) and a sibling added, so React's own nodes stay intact.
+    function relabel(f) {
+      var d; try { d = f.contentDocument; } catch (err) { return; }
+      if (!d || !d.body) return;
+      var h = f.dataset.heading, desc = f.dataset.description;
+      if (h !== undefined) {
+        var t = d.querySelector('.card .chart-title');
+        if (t && t.textContent !== h) t.textContent = h;
+      }
+      if (desc !== undefined) {
+        var sub = d.querySelector('.card .chart-sub:not(.site-desc)');
+        if (sub) {
+          if (sub.style.display !== 'none') sub.style.display = 'none';
+          var mine = sub.nextElementSibling && sub.nextElementSibling.classList.contains('site-desc') ? sub.nextElementSibling : null;
+          if (desc && !mine) {
+            mine = d.createElement('p'); mine.className = sub.className + ' site-desc';
+            sub.parentNode.insertBefore(mine, sub.nextSibling);
+          }
+          if (mine && mine.textContent !== desc) mine.textContent = desc;
+        }
+      }
+      if (!f._relabelObs && (h !== undefined || desc !== undefined)) {
+        f._relabelObs = new MutationObserver(function () { relabel(f); });
+        f._relabelObs.observe(d.body, { childList: true, subtree: true });
+      }
+    }
+    document.addEventListener('load', function (e) {
+      if (e.target.matches && e.target.matches('.iframe-embed iframe')) {
+        if (e.target._relabelObs) { e.target._relabelObs.disconnect(); e.target._relabelObs = null; }
+        lock(e.target); relabel(e.target);
+      }
+    }, true);
+    // Let each report set its own height.
+    addEventListener('message', function (e) {
+      if (!e.data || e.data.type !== 'listening-report:height') return;
+      document.querySelectorAll('.iframe-embed iframe').forEach(function (f) {
+        if (f.contentWindow !== e.source) return;
+        lock(f); relabel(f);
+        var h = Math.ceil(e.data.height) + 'px';
+        if (f.style.height !== h) f.style.height = h;
+      });
+    });
+    // Keep the reports in step with the site's light/dark toggle.
+    var root = document.documentElement;
+    function sync() {
+      var t = root.getAttribute('data-theme');
+      t = (t === 'light' || t === 'dark') ? t : 'auto';
+      document.querySelectorAll('.iframe-embed iframe').forEach(function (f) {
+        var next = f.dataset.src + '#' + f.dataset.hash + '&theme=' + t;
+        if (f.getAttribute('src') !== next) f.setAttribute('src', next);
+      });
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', sync); else sync();
+    new MutationObserver(sync).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+  })();
+</script>
+{{- end }}
