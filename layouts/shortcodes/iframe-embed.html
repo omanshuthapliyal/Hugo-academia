@@ -9,7 +9,8 @@
        src     path under /static (required)
        plot    value for the report's #plot= hash (optional)
        title   accessible title + caption (optional; defaults to heading)
-       heading replaces the plot's own heading text (optional)
+       heading replaces the plot's own heading text; heading="" hides it
+               (use when the post has its own section heading for the plot)
        description  replaces the plot's own sub-heading/description text;
                description="" hides it (optional; omit to keep the original)
        height  starting height in px before the report reports its own (default 640)
@@ -22,6 +23,7 @@
 {{- $src := .Get "src" -}}
 {{- $plot := .Get "plot" -}}
 {{- $heading := .Get "heading" -}}
+{{- $hasHeading := isset .Params "heading" -}}
 {{- $title := .Get "title" | default $heading | default "Interactive figure" -}}
 {{- $hasDesc := isset .Params "description" -}}
 {{- $height := .Get "height" | default "640" -}}
@@ -31,7 +33,7 @@
 {{- $hash := cond (ne $plot "") (printf "plot=%s&embed" $plot) "embed" -}}
 <figure class="iframe-embed{{ if $wide }} iframe-embed--wide{{ end }}">
   <iframe data-src="{{ $url }}" data-hash="{{ $hash }}" src="{{ printf "%s#%s" $url $hash | safeURL }}"
-    {{- with $heading }} data-heading="{{ . }}"{{ end }}
+    {{- if $hasHeading }} data-heading="{{ $heading }}"{{ end }}
     {{- if $hasDesc }} data-description="{{ .Get "description" }}"{{ end }}
     title="{{ $title }}" loading="lazy" allowfullscreen scrolling="no"
     style="width:100%;border:0;display:block;height:{{ $height }}px"></iframe>
@@ -75,7 +77,8 @@
       var h = f.dataset.heading, desc = f.dataset.description;
       if (h !== undefined) {
         var t = d.querySelector('.card .chart-title');
-        if (t && t.textContent !== h) t.textContent = h;
+        if (t && h === '') { if (t.style.display !== 'none') t.style.display = 'none'; }
+        else if (t && t.textContent !== h) t.textContent = h;
       }
       if (desc !== undefined) {
         var sub = d.querySelector('.card .chart-sub:not(.site-desc)');
