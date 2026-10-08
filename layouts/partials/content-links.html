@@ -17,7 +17,13 @@
      the post's permalink ever changes. If the slug doesn't match a real
      post, GetPage returns nil and the button silently doesn't render,
      rather than emitting a broken link. */}}
+{{/* Callers normally pass the page itself. publication-item.html instead
+     passes (dict "page" . "hideDoi" true): on the Publications list the
+     paper's title already links to its DOI, so a separate DOI button there
+     only repeated that link. The DOI button stays on the paper's own page. */}}
 {{ $page := . }}
+{{ $hideDoi := false }}
+{{ if reflect.IsMap . }}{{ $page = .page }}{{ $hideDoi = .hideDoi | default false }}{{ end }}
 {{ $blogPost := "" }}
 {{ with $page.Params.blog_post }}
   {{ with $page.Site.GetPage (printf "blog/%s" .) }}
@@ -34,11 +40,12 @@
   {{ with index (site.Data.citations | default dict) $page.File.ContentBaseName }}{{ $bibtex = strings.TrimSpace . }}{{ end }}
 {{ end }}
 
-{{ $hasLinks := or $page.Params.doi $page.Params.pdf $page.Params.code $page.Params.slides $page.Params.poster $page.Params.video $blogPost $page.Params.website $bibtex }}
+{{ $doi := cond $hideDoi "" ($page.Params.doi | default "") }}
+{{ $hasLinks := or $doi $page.Params.pdf $page.Params.code $page.Params.slides $page.Params.poster $page.Params.video $blogPost $page.Params.website $bibtex }}
 
 {{ if $hasLinks }}
 <div class="content-links">
-    {{ with $page.Params.doi }}
+    {{ with $doi }}
     <a href="https://doi.org/{{ . }}" class="content-links__link" title="DOI" target="_blank" rel="noopener">
         {{ partial "icons/icons.html" "external-link" }}
         <span class="visually-hidden">DOI</span>
