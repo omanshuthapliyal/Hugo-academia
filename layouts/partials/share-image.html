@@ -3,7 +3,8 @@
        1. project pages: the card image (`image`, 16:9)
        2. page bundles (e.g. blog posts with figures): a resource whose name
           contains feature, cover or thumb, else the first image in the bundle
-       3. everything else: the profile photo */}}
+       3. blog posts with no image: a generated title card
+       4. everything else: the profile photo */}}
 {{ $out := dict }}
 {{ $static := "" }}
 {{ if and (eq .Section "projects") .IsPage .Params.image }}
@@ -16,6 +17,29 @@
   {{ if and (not $pick) $imgs }}{{ $pick = index $imgs 0 }}{{ end }}
   {{ with $pick }}
     {{ $out = dict "url" .Permalink "width" .Width "height" .Height "large" (ge .Width 600) }}
+  {{ end }}
+  {{/* Blog posts with no image of their own get a generated 1200x630 title
+       card (post title, date, site name) instead of the profile photo. */}}
+  {{ if and (not $out) (eq .Section "blog") }}
+    {{ $base := resources.Get "images/share/card-base.png" }}
+    {{ $layer := resources.Get "images/share/card-title.png" }}
+    {{ $serif := resources.Get "fonts/share/Lora-SemiBold.ttf" }}
+    {{ $sans := resources.Get "fonts/share/IBMPlexSans-Regular.ttf" }}
+    {{ $sansMed := resources.Get "fonts/share/IBMPlexSans-Medium.ttf" }}
+    {{ if and $base $layer $serif $sans $sansMed }}
+      {{ $title := .Title | plainify | htmlUnescape | string }}
+      {{ $size := 60 }}{{ $lh := 18 }}
+      {{ if gt (len $title) 70 }}{{ $size = 52 }}{{ $lh = 14 }}{{ end }}
+      {{ $titleImg := $layer | images.Filter (images.Text $title (dict "font" $serif "size" $size "color" "#2d2d2d" "x" 0 "y" 0 "linespacing" $lh)) }}
+      {{ $label := printf "%s  ·  Blog" site.Title }}
+      {{ $foot := printf "%s  ·  %s" (.Date.Format "2 January 2006") (strings.TrimSuffix "/" (strings.TrimPrefix "https://" site.BaseURL)) }}
+      {{ $card := $base | images.Filter
+          (images.Text $label (dict "font" $sansMed "size" 26 "color" "#8f3a3a" "x" 80 "y" 82))
+          (images.Overlay $titleImg 80 160)
+          (images.Text $foot (dict "font" $sans "size" 24 "color" "#696969" "x" 80 "y" 548)) }}
+      {{ $card = $card | resources.Copy (printf "share/%s.png" (lower (.File.ContentBaseName | default (.Title | urlize)))) }}
+      {{ $out = dict "url" $card.Permalink "width" 1200 "height" 630 "large" true }}
+    {{ end }}
   {{ end }}
 {{ end }}
 {{ if not $out }}
