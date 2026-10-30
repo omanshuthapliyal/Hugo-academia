@@ -1,10 +1,12 @@
 {{/* Picks the image shown when a page is shared (LinkedIn, X, Slack...).
      Returns a dict: url, width, height, large (true = wide preview card).
        1. project pages: the card image (`image`, 16:9)
-       2. page bundles (e.g. blog posts with figures): a resource whose name
-          contains feature, cover or thumb, else the first image in the bundle
-       3. blog posts with no image: a generated title card
-       4. everything else: the profile photo */}}
+       2. a bundle image whose name contains feature, cover or thumb
+       3. the first image that appears in the post's body: a bundle image,
+          a file under static/, or an external URL
+       4. any other image in the bundle
+       5. blog posts with no image at all: a generated title card
+       6. everything else: the profile photo */}}
 {{ $out := dict }}
 {{ $static := "" }}
 {{ if and (eq .Section "projects") .IsPage .Params.image }}
@@ -14,7 +16,25 @@
   {{ range .Resources.ByType "image" }}{{ if in (slice "image/png" "image/jpeg" "image/webp" "image/gif") .MediaType.Type }}{{ $imgs = $imgs | append . }}{{ end }}{{ end }}
   {{ $pick := "" }}
   {{ range $imgs }}{{ if and (not $pick) (findRE `(?i)(feature|cover|thumb)` .Name) }}{{ $pick = . }}{{ end }}{{ end }}
-  {{ if and (not $pick) $imgs }}{{ $pick = index $imgs 0 }}{{ end }}
+  {{/* First image in the rendered body, in reading order. */}}
+  {{ if not $pick }}
+    {{ range first 1 (findRESubmatch `<img[^>]*?\ssrc=["']?([^"' >]+)` .Content 1) }}
+      {{ $src := index . 1 | htmlUnescape }}
+      {{ $name := path.Base $src }}
+      {{ with $.Resources.GetMatch $name }}
+        {{ if in (slice "image/png" "image/jpeg" "image/webp" "image/gif") .MediaType.Type }}{{ $pick = . }}{{ end }}
+      {{ else }}
+        {{ if findRE `^https?://` $src }}
+          {{ $out = dict "url" $src "width" 0 "height" 0 "large" true }}
+        {{ else if hasPrefix $src "/" }}
+          {{ $w := 0 }}{{ $h := 0 }}
+          {{ with printf "static%s" $src }}{{ if fileExists . }}{{ with imageConfig . }}{{ $w = .Width }}{{ $h = .Height }}{{ end }}{{ end }}{{ end }}
+          {{ $out = dict "url" ($src | absURL) "width" $w "height" $h "large" (or (eq $w 0) (ge $w 600)) }}
+        {{ end }}
+      {{ end }}
+    {{ end }}
+  {{ end }}
+  {{ if and (not $pick) (not $out) $imgs }}{{ $pick = index $imgs 0 }}{{ end }}
   {{ with $pick }}
     {{ $out = dict "url" .Permalink "width" .Width "height" .Height "large" (ge .Width 600) }}
   {{ end }}
